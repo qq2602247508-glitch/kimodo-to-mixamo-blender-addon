@@ -29,7 +29,7 @@ The addon keeps the working Rokoko retarget algorithm, removes the login/cloud w
 
 ## Install
 
-1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_3_9_one_click_bind.zip`.
+1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_4_0_action_library.zip`.
 2. In Blender, open `Edit > Preferences > Add-ons`.
 3. Click `Install...`.
 4. Select the zip file.
@@ -94,6 +94,50 @@ Use this when you manually send a BVH from Kimodo/Viser to Blender.
 
 The addon will bind the current/last BVH source to the selected Mixamo target.
 
+### Save Current Action to External Library
+
+Use this after a retargeted action looks good.
+
+1. Open `Kimodo Action Library`.
+2. Set `Action Library` to an external folder, for example:
+
+```text
+E:\400-game assets\ai\kimodo\action_library
+```
+
+3. Set:
+
+- `Character`: for example `hero` or `humanoid`
+- `Category`: for example `idle`, `locomotion`, `jump`, `combat`
+- `Action Name`: for example `idle_01`, `walk_forward_01`, `run_forward_01`
+
+4. Click `Save Current Retarget to Library`.
+
+The addon saves:
+
+```text
+action_library/
+  humanoid_mixamo/
+    locomotion/
+      hero_walk_forward_01/
+        action.blend
+        meta.json
+```
+
+The `action.blend` stores the Blender Action datablock. The `meta.json` stores prompt, seed, duration, source BVH path, target name, and creation time.
+
+### Load Action from External Library
+
+Use this to preview a saved action on the current Mixamo target.
+
+1. Open `Kimodo Action Library`.
+2. Set `Action Library` to the folder that contains saved actions.
+3. Click `Refresh Action Library`.
+4. Select an action in the list.
+5. Click `Load Selected Action`.
+
+The selected Action is loaded from the external `.blend` file and assigned to the current Mixamo target.
+
 ### Manual Tools
 
 The `Retargeting` panel also includes:
@@ -119,6 +163,7 @@ If your model was exported from another tool and faces `+X`, use `Check Target A
 - This addon does not include NVIDIA Kimodo itself.
 - Local Kimodo generation may take time while the text encoder loads.
 - The retarget core is based on Rokoko's Blender retarget workflow, trimmed for local Kimodo/Mixamo use.
+- External action library saving currently stores `.blend` Action data plus `meta.json`. FBX/Godot animation-pack export is planned as a later workflow step.
 
 ## License
 

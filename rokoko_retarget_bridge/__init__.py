@@ -4,7 +4,7 @@ bl_info = {
     "category": "Animation",
     "location": "View 3D > Sidebar > Rokoko",
     "description": "Original Rokoko retargeting UI with Kimodo BVH Bridge, without login or cloud features.",
-    "version": (1, 4, 3, 9),
+    "version": (1, 4, 4, 0),
     "blender": (2, 80, 0),
 }
 
@@ -14,6 +14,12 @@ import sys
 from . import bridge
 from . import core
 from . import properties
+from .operators.action_library import (
+    ActionLibraryLoadSelected,
+    ActionLibraryRefresh,
+    ActionLibrarySaveCurrent,
+    RRO_UL_ActionLibrary,
+)
 from .operators.bridge import (
     BridgeGeneratePrompt,
     BridgeOneClickBindLast,
@@ -34,6 +40,7 @@ from .operators.retargeting import (
     RetargetAnimation,
 )
 from .panels.bridge import BridgePanel
+from .panels.action_library import ActionLibraryPanel
 from .panels.retargeting import BoneListItem, RetargetingPanel, RSL_UL_BoneList
 
 
@@ -43,8 +50,11 @@ absolute_min_ver = (2, 80, 75)
 classes = [
     RetargetingPanel,
     BridgePanel,
+    ActionLibraryPanel,
     RSL_UL_BoneList,
+    RRO_UL_ActionLibrary,
     BoneListItem,
+    properties.RROActionLibraryItem,
     properties.RROBridgeSettings,
     BuildBoneList,
     AddBoneListItem,
@@ -64,6 +74,9 @@ classes = [
     BridgeOneClickGenerateBind,
     BridgeOneClickBindLast,
     BridgeStartKimodo,
+    ActionLibraryRefresh,
+    ActionLibrarySaveCurrent,
+    ActionLibraryLoadSelected,
 ]
 
 
@@ -114,6 +127,8 @@ def unregister():
         "rsl_retargeting_use_pose",
         "rsl_retargeting_bone_list",
         "rsl_retargeting_bone_list_index",
+        "rro_action_library_items",
+        "rro_action_library_index",
         "rro_bridge",
     ):
         if hasattr(bpy.types.Scene, attr):
