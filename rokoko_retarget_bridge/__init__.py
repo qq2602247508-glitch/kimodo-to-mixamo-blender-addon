@@ -4,7 +4,7 @@ bl_info = {
     "category": "Animation",
     "location": "View 3D > Sidebar > Rokoko",
     "description": "Original Rokoko retargeting UI with Kimodo BVH Bridge, without login or cloud features.",
-    "version": (1, 4, 4, 0),
+    "version": (1, 4, 5, 0),
     "blender": (2, 80, 0),
 }
 
@@ -15,6 +15,7 @@ from . import bridge
 from . import core
 from . import properties
 from .operators.action_library import (
+    ActionLibraryLoadCharacterSelected,
     ActionLibraryLoadSelected,
     ActionLibraryRefresh,
     ActionLibrarySaveCurrent,
@@ -40,7 +41,7 @@ from .operators.retargeting import (
     RetargetAnimation,
 )
 from .panels.bridge import BridgePanel
-from .panels.action_library import ActionLibraryPanel
+from .panels.action_library import ActionLibraryPanel, CurrentCharacterActionsPanel
 from .panels.retargeting import BoneListItem, RetargetingPanel, RSL_UL_BoneList
 
 
@@ -50,6 +51,7 @@ absolute_min_ver = (2, 80, 75)
 classes = [
     RetargetingPanel,
     BridgePanel,
+    CurrentCharacterActionsPanel,
     ActionLibraryPanel,
     RSL_UL_BoneList,
     RRO_UL_ActionLibrary,
@@ -76,6 +78,7 @@ classes = [
     BridgeStartKimodo,
     ActionLibraryRefresh,
     ActionLibrarySaveCurrent,
+    ActionLibraryLoadCharacterSelected,
     ActionLibraryLoadSelected,
 ]
 
@@ -129,6 +132,8 @@ def unregister():
         "rsl_retargeting_bone_list_index",
         "rro_action_library_items",
         "rro_action_library_index",
+        "rro_character_action_items",
+        "rro_character_action_index",
         "rro_bridge",
     ):
         if hasattr(bpy.types.Scene, attr):

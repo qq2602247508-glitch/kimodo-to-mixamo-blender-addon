@@ -37,13 +37,20 @@ class RROBridgeSettings(bpy.types.PropertyGroup):
         subtype="DIR_PATH",
     )
     action_name: bpy.props.StringProperty(name="Action Name", default="idle")
-    character_prefix: bpy.props.StringProperty(name="Character", default="humanoid")
+    character_prefix: bpy.props.StringProperty(
+        name="Character ID",
+        description="Leave empty to use the selected Mixamo Target name",
+        default="",
+    )
     action_category: bpy.props.StringProperty(name="Category", default="general")
+    show_all_library_actions: bpy.props.BoolProperty(name="Show All Actions", default=False)
     selected_library_action: bpy.props.StringProperty(name="Library Action", default="")
 
 
 class RROActionLibraryItem(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name", default="")
+    character_prefix: bpy.props.StringProperty(name="Character", default="")
+    category: bpy.props.StringProperty(name="Category", default="")
     path: bpy.props.StringProperty(name="Path", default="")
     meta_path: bpy.props.StringProperty(name="Meta Path", default="")
 
@@ -87,6 +94,8 @@ def register():
     Scene.rro_bridge = PointerProperty(type=RROBridgeSettings)
     Scene.rro_action_library_items = CollectionProperty(type=RROActionLibraryItem)
     Scene.rro_action_library_index = EnumSafeIntProperty()
+    Scene.rro_character_action_items = CollectionProperty(type=RROActionLibraryItem)
+    Scene.rro_character_action_index = EnumSafeIntProperty()
 
     for bone in animation_lists.get_bones().keys():
         setattr(Object, "rsl_actor_" + bone, StringProperty(name=bone))

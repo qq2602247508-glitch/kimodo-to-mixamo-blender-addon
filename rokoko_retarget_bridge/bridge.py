@@ -51,7 +51,7 @@ def _set_active(obj):
 
 def _target_for_scene(scene):
     st = settings()
-    return _armature_from_object(st.target_object) or scene.rsl_retargeting_armature_target
+    return _armature_from_object(st.target_object)
 
 
 def run_bind_workflow(context, source=None, *, auto_fix_axis=True):
@@ -60,7 +60,7 @@ def run_bind_workflow(context, source=None, *, auto_fix_axis=True):
     source = source or scene.rsl_retargeting_armature_source
     target = _target_for_scene(scene)
     if target is None:
-        raise RuntimeError("Please select a Mixamo Target first, then try again.")
+        raise RuntimeError("Please select a Mixamo Target in the Kimodo Bridge panel first, then try again.")
     if source is None:
         raise RuntimeError("No BVH source selected. Send/import a BVH first.")
 
@@ -135,7 +135,7 @@ def _import_bvh(path):
     st.last_source_name = imported.name
     st.last_status = "Imported BVH"
 
-    target = _armature_from_object(st.target_object) or scene.rsl_retargeting_armature_target
+    target = _armature_from_object(st.target_object)
     if target is not None:
         scene.rsl_retargeting_armature_target = target
 

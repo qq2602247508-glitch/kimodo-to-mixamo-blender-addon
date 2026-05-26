@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.5.0
+
+- Split the action library UI into `Current Character Actions` and `Action Library`.
+- Add a current-character action list filtered by `Character ID`.
+- Leave `Character ID` empty to use the selected `Mixamo Target` name automatically.
+- Make action save/load use the explicit `Mixamo Target` from the Kimodo Bridge panel.
+- Prevent one-click bind and action loading from falling back to the first or old Rokoko target in multi-character scenes.
+- Show character/category metadata in action lists.
+
 ## 1.4.4.0
 
 - Add `Kimodo Action Library` panel.

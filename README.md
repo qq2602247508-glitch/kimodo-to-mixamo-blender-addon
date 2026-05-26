@@ -29,7 +29,7 @@ The addon keeps the working Rokoko retarget algorithm, removes the login/cloud w
 
 ## Install
 
-1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_4_0_action_library.zip`.
+1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_5_0_character_actions.zip`.
 2. In Blender, open `Edit > Preferences > Add-ons`.
 3. Click `Install...`.
 4. Select the zip file.
@@ -98,7 +98,7 @@ The addon will bind the current/last BVH source to the selected Mixamo target.
 
 Use this after a retargeted action looks good.
 
-1. Open `Kimodo Action Library`.
+1. Open `Current Character Actions`.
 2. Set `Action Library` to an external folder, for example:
 
 ```text
@@ -107,7 +107,7 @@ E:\400-game assets\ai\kimodo\action_library
 
 3. Set:
 
-- `Character`: for example `hero` or `humanoid`
+- `Character ID`: optional. Leave empty to use the selected `Mixamo Target` name, or type a stable character id such as `hero`.
 - `Category`: for example `idle`, `locomotion`, `jump`, `combat`
 - `Action Name`: for example `idle_01`, `walk_forward_01`, `run_forward_01`
 
@@ -126,11 +126,22 @@ action_library/
 
 The `action.blend` stores the Blender Action datablock. The `meta.json` stores prompt, seed, duration, source BVH path, target name, and creation time.
 
-### Load Action from External Library
+### Current Character Actions
 
-Use this to preview a saved action on the current Mixamo target.
+Use this page for the character you are currently working on.
 
-1. Open `Kimodo Action Library`.
+1. Select the character in `Mixamo Target`.
+2. Click `Refresh`.
+3. The list shows only actions whose saved `Character ID` matches the current target or the typed `Character ID`.
+4. Select an action and click `Load Current Character Action`.
+
+This solves the multi-character scene problem: one-click bind and library load use the explicit `Mixamo Target` from the Kimodo Bridge panel, not the first Mixamo armature in the scene.
+
+### Action Library
+
+Use this page to browse every saved action in the external library.
+
+1. Open `Action Library`.
 2. Set `Action Library` to the folder that contains saved actions.
 3. Click `Refresh Action Library`.
 4. Select an action in the list.

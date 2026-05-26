@@ -37,11 +37,14 @@ class BridgeUseRokokoTarget(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        target = context.scene.rsl_retargeting_armature_target
+        target = bridge._armature_from_object(context.object)
         if target is None:
-            self.report({"ERROR"}, "Choose a target in the Rokoko Retargeting panel first")
+            target = context.scene.rsl_retargeting_armature_target
+        if target is None:
+            self.report({"ERROR"}, "Select a Mixamo armature or mesh first")
             return {"CANCELLED"}
         context.scene.rro_bridge.target_object = target
+        context.scene.rsl_retargeting_armature_target = target
         self.report({"INFO"}, f"Bridge target set to {target.name}")
         return {"FINISHED"}
 
@@ -101,9 +104,9 @@ class BridgeOneClickGenerateBind(bpy.types.Operator):
 
     def execute(self, context):
         st = context.scene.rro_bridge
-        target = bridge._armature_from_object(st.target_object) or context.scene.rsl_retargeting_armature_target
+        target = bridge._armature_from_object(st.target_object)
         if target is None:
-            message = "Please select a Mixamo Target first, then try again."
+            message = "Please select a Mixamo Target in the Kimodo Bridge panel first, then try again."
             st.last_status = message
             self.report({"ERROR"}, message)
             return {"CANCELLED"}

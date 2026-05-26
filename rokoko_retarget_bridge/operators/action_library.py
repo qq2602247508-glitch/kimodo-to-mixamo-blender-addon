@@ -17,7 +17,7 @@ def _safe_slug(text):
 
 def _target(context):
     st = context.scene.rro_bridge
-    return bridge._armature_from_object(st.target_object) or context.scene.rsl_retargeting_armature_target
+    return bridge._armature_from_object(st.target_object)
 
 
 def _library_root(context):
@@ -26,9 +26,27 @@ def _library_root(context):
 
 
 def _make_action_name(st):
-    prefix = _safe_slug(st.character_prefix)
+    prefix = _current_character_slug(bpy.context)
     action = _safe_slug(st.action_name)
     return f"{prefix}_{action}"
+
+
+def _current_character_slug(context):
+    st = context.scene.rro_bridge
+    target = _target(context)
+    if st.character_prefix.strip():
+        return _safe_slug(st.character_prefix)
+    if target is not None:
+        return _safe_slug(target.name)
+    return "humanoid"
+
+
+def _fill_item(item, meta, meta_path, blend_path):
+    item.name = meta.get("name") or meta_path.parent.name
+    item.character_prefix = meta.get("character_prefix") or ""
+    item.category = meta.get("category") or ""
+    item.path = str(blend_path)
+    item.meta_path = str(meta_path)
 
 
 class ActionLibraryRefresh(bpy.types.Operator):
@@ -40,10 +58,12 @@ class ActionLibraryRefresh(bpy.types.Operator):
     def execute(self, context):
         root = _library_root(context)
         context.scene.rro_action_library_items.clear()
+        context.scene.rro_character_action_items.clear()
         if not root.exists():
             self.report({"WARNING"}, f"Library folder does not exist: {root}")
             return {"FINISHED"}
 
+        current_character = _current_character_slug(context)
         for meta_path in sorted(root.rglob("meta.json")):
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -53,11 +73,15 @@ class ActionLibraryRefresh(bpy.types.Operator):
             if not blend_path.exists():
                 continue
             item = context.scene.rro_action_library_items.add()
-            item.name = meta.get("name") or meta_path.parent.name
-            item.path = str(blend_path)
-            item.meta_path = str(meta_path)
+            _fill_item(item, meta, meta_path, blend_path)
+            if _safe_slug(meta.get("character_prefix") or "") == current_character:
+                character_item = context.scene.rro_character_action_items.add()
+                _fill_item(character_item, meta, meta_path, blend_path)
 
-        context.scene.rro_bridge.last_status = f"Loaded {len(context.scene.rro_action_library_items)} library actions"
+        context.scene.rro_bridge.last_status = (
+            f"Loaded {len(context.scene.rro_character_action_items)} current-character actions, "
+            f"{len(context.scene.rro_action_library_items)} total"
+        )
         return {"FINISHED"}
 
 
@@ -92,7 +116,7 @@ class ActionLibrarySaveCurrent(bpy.types.Operator):
         meta = {
             "name": action_name,
             "category": category,
-            "character_prefix": _safe_slug(st.character_prefix),
+            "character_prefix": _current_character_slug(context),
             "prompt": st.prompt,
             "seed": st.prompt_seed,
             "duration": st.prompt_duration,
@@ -111,6 +135,30 @@ class ActionLibrarySaveCurrent(bpy.types.Operator):
         return {"FINISHED"}
 
 
+def _load_library_item(context, item):
+    target = _target(context)
+    if target is None:
+        raise RuntimeError("Please select a Mixamo Target first.")
+
+    blend_path = Path(item.path)
+    if not blend_path.exists():
+        raise RuntimeError(f"Action file not found: {blend_path}")
+
+    with bpy.data.libraries.load(str(blend_path), link=False) as (data_from, data_to):
+        data_to.actions = list(data_from.actions)
+
+    if not data_to.actions:
+        raise RuntimeError("No action found in selected library file.")
+
+    action = data_to.actions[0]
+    action.use_fake_user = True
+    if target.animation_data is None:
+        target.animation_data_create()
+    target.animation_data.action = action
+    context.scene.rro_bridge.last_status = f"Loaded action: {action.name}"
+    return action
+
+
 class ActionLibraryLoadSelected(bpy.types.Operator):
     bl_idname = "rro_action_library.load_selected"
     bl_label = "Load Selected Action"
@@ -118,40 +166,47 @@ class ActionLibraryLoadSelected(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        target = _target(context)
-        if target is None:
-            self.report({"ERROR"}, "Please select a Mixamo Target first.")
-            return {"CANCELLED"}
-
         items = context.scene.rro_action_library_items
         index = context.scene.rro_action_library_index
         if index < 0 or index >= len(items):
             self.report({"ERROR"}, "Select an action from the library list first.")
             return {"CANCELLED"}
 
-        item = items[index]
-        blend_path = Path(item.path)
-        if not blend_path.exists():
-            self.report({"ERROR"}, f"Action file not found: {blend_path}")
+        try:
+            action = _load_library_item(context, items[index])
+        except Exception as exc:
+            self.report({"ERROR"}, str(exc))
+            return {"CANCELLED"}
+        self.report({"INFO"}, f"Loaded action {action.name}")
+        return {"FINISHED"}
+
+
+class ActionLibraryLoadCharacterSelected(bpy.types.Operator):
+    bl_idname = "rro_action_library.load_character_selected"
+    bl_label = "Load Current Character Action"
+    bl_description = "Load the selected action saved for the current character"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        items = context.scene.rro_character_action_items
+        index = context.scene.rro_character_action_index
+        if index < 0 or index >= len(items):
+            self.report({"ERROR"}, "Select an action from the current character list first.")
             return {"CANCELLED"}
 
-        with bpy.data.libraries.load(str(blend_path), link=False) as (data_from, data_to):
-            data_to.actions = list(data_from.actions)
-
-        if not data_to.actions:
-            self.report({"ERROR"}, "No action found in selected library file.")
+        try:
+            action = _load_library_item(context, items[index])
+        except Exception as exc:
+            self.report({"ERROR"}, str(exc))
             return {"CANCELLED"}
-
-        action = data_to.actions[0]
-        action.use_fake_user = True
-        if target.animation_data is None:
-            target.animation_data_create()
-        target.animation_data.action = action
-        context.scene.rro_bridge.last_status = f"Loaded action: {action.name}"
         self.report({"INFO"}, f"Loaded action {action.name}")
         return {"FINISHED"}
 
 
 class RRO_UL_ActionLibrary(bpy.types.UIList):
     def draw_item(self, _context, layout, _data, item, _icon, _active_data, _active_propname, _index):
-        layout.label(text=item.name, icon="ACTION")
+        detail = " / ".join(part for part in (item.character_prefix, item.category) if part)
+        if detail:
+            layout.label(text=f"{item.name}  [{detail}]", icon="ACTION")
+        else:
+            layout.label(text=item.name, icon="ACTION")
