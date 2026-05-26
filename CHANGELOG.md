@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.10.0
+
+- Fix old resource actions incorrectly appearing in `Current Model Action Library`.
+- Add explicit action scopes: resource actions stay in `Resource Action Library`; current-model actions only appear after `Send to Current Model`.
+- Keep temporary retarget source armatures visible while retargeting so Blender has an active object for Rokoko's mode switching.
+
 ## 1.4.9.0
 
 - Simplify action library UI into `Current Model Action Library` and `Resource Action Library`.

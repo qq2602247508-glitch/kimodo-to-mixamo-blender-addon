@@ -8,6 +8,10 @@ import bpy
 
 from .. import bridge, mixamo_tools
 
+MODEL_ID_PROP = "rro_action_model_id"
+RESOURCE_SCOPE = "resource"
+CURRENT_MODEL_SCOPE = "current_model"
+
 
 def _safe_slug(text):
     text = (text or "").strip().lower()
@@ -39,6 +43,17 @@ def _current_character_slug(context):
     if target is not None:
         return _safe_slug(target.name)
     return "humanoid"
+
+
+def _current_model_id(context, *, create=False):
+    target = _target(context)
+    if target is None:
+        if create:
+            raise RuntimeError("Please select a Mixamo Target first.")
+        return ""
+    if create and not target.get(MODEL_ID_PROP):
+        target[MODEL_ID_PROP] = _safe_slug(target.name)
+    return _safe_slug(target.get(MODEL_ID_PROP, ""))
 
 
 def _fill_item(item, meta, meta_path, blend_path):
@@ -131,6 +146,8 @@ def _save_target_action(context, action_slug, category_slug, *, source_meta=None
         "source_bvh": st.last_bvh_path,
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "rig": "mixamo",
+        "scope": RESOURCE_SCOPE,
+        "model_id": "",
     }
     if source_meta:
         meta["adopted_from"] = {
@@ -155,7 +172,7 @@ def _duplicate_target_as_source(context, action, name_slug):
     source.animation_data_clear()
     source.animation_data_create()
     source.animation_data.action = action
-    source.hide_viewport = True
+    source.hide_viewport = False
     source.hide_render = True
 
     collection = bpy.data.collections.get("Kimodo Library Sources")
@@ -188,6 +205,7 @@ def _copy_library_item_to_current_character(context, item):
     category = _safe_slug(meta.get("category") or st.action_category)
     action_slug = _action_slug_from_library_item(item, meta)
     action_name = _character_action_name(context, action_slug)
+    model_id = _current_model_id(context, create=True)
     target_dir = _library_root(context) / "humanoid_mixamo" / category / action_name
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -209,6 +227,8 @@ def _copy_library_item_to_current_character(context, item):
             "character_prefix": _current_character_slug(context),
             "target": (_target(context).name if _target(context) else ""),
             "created_at": datetime.now().isoformat(timespec="seconds"),
+            "scope": CURRENT_MODEL_SCOPE,
+            "model_id": model_id,
             "adopted_from": {
                 "name": meta.get("name", item.name),
                 "character_prefix": meta.get("character_prefix", item.character_prefix),
@@ -254,7 +274,7 @@ class ActionLibraryRefresh(bpy.types.Operator):
             self.report({"WARNING"}, f"Library folder does not exist: {root}")
             return {"FINISHED"}
 
-        current_character = _current_character_slug(context)
+        current_model = _current_model_id(context, create=False)
         for meta_path in sorted(root.rglob("meta.json")):
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -263,11 +283,12 @@ class ActionLibraryRefresh(bpy.types.Operator):
             blend_path = meta_path.parent / "action.blend"
             if not blend_path.exists():
                 continue
-            item_character = _safe_slug(meta.get("character_prefix") or "")
-            if item_character == current_character:
+            scope = meta.get("scope") or RESOURCE_SCOPE
+            item_model = _safe_slug(meta.get("model_id") or "")
+            if scope == CURRENT_MODEL_SCOPE and current_model and item_model == current_model:
                 character_item = context.scene.rro_character_action_items.add()
                 _fill_item(character_item, meta, meta_path, blend_path)
-            else:
+            elif scope == RESOURCE_SCOPE:
                 item = context.scene.rro_action_library_items.add()
                 _fill_item(item, meta, meta_path, blend_path)
 

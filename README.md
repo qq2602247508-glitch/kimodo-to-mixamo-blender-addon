@@ -29,7 +29,7 @@ The addon keeps the working Rokoko retarget algorithm, removes the login/cloud w
 
 ## Install
 
-1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_9_0_simplified_action_libraries.zip`.
+1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_10_0_scoped_action_libraries.zip`.
 2. In Blender, open `Edit > Preferences > Add-ons`.
 3. Click `Install...`.
 4. Select the zip file.
@@ -120,7 +120,7 @@ This page is the shared action resource library.
 2. Click `Send to Current Model` to copy it into the selected model's current-model library.
 3. Click `Delete` to remove the selected resource action from disk.
 
-Resource actions and current-model actions are shown in separate lists, so a new model has a clean empty current-model library until you send actions into it.
+Resource actions and current-model actions are stored with separate scopes. A new model has a clean empty current-model library until you explicitly click `Send to Current Model` from the resource library.
 
 ### Manual Tools
 
