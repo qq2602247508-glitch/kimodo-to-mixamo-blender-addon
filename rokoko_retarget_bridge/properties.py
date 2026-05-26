@@ -17,7 +17,11 @@ class RROBridgeSettings(bpy.types.PropertyGroup):
         type=bpy.types.Object,
         poll=bridge.poll_target_object,
     )
-    auto_retarget_on_receive: bpy.props.BoolProperty(name="Auto Retarget on Receive", default=True)
+    auto_retarget_on_receive: bpy.props.BoolProperty(
+        name="Auto Retarget Imported BVH",
+        description="When a BVH arrives from Kimodo Bridge, immediately build the bone list and retarget it to the selected Mixamo target",
+        default=True,
+    )
     delete_source_after_retarget: bpy.props.BoolProperty(
         name="Delete Source After Retarget",
         description="Remove imported BVH/library source armatures after a successful retarget",
@@ -48,8 +52,6 @@ class RROBridgeSettings(bpy.types.PropertyGroup):
         default="",
     )
     action_category: bpy.props.StringProperty(name="Category", default="general")
-    show_all_library_actions: bpy.props.BoolProperty(name="Show All Actions", default=False)
-    selected_library_action: bpy.props.StringProperty(name="Library Action", default="")
 
 
 class RROActionLibraryItem(bpy.types.PropertyGroup):

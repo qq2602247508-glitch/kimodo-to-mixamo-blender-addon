@@ -165,9 +165,10 @@ class BridgeOneClickBindLast(bpy.types.Operator):
             source = bpy.data.objects.get(st.last_source_name)
         try:
             result = bridge.run_bind_workflow(context, source, auto_fix_axis=True)
+            source_name = source.name if source and source.name in bpy.data.objects else "source"
             self.report(
                 {"INFO"},
-                f"Bound {result['source'].name} to {result['target'].name}",
+                f"Bound {source_name} to {result['target'].name}",
             )
         except Exception as exc:
             st.last_status = f"Error: {exc}"

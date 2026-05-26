@@ -1,5 +1,6 @@
 import json
 import re
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -64,12 +65,23 @@ def _character_action_name(context, action_name):
     return f"{_current_character_slug(context)}_{_safe_slug(action_name)}"
 
 
+def _cleanup_action(action):
+    if action and action.name in bpy.data.actions and action.users == 0:
+        bpy.data.actions.remove(action)
+
+
 def _action_slug_from_library_item(item, meta):
     name = _safe_slug(meta.get("name") or item.name)
     old_character = _safe_slug(meta.get("character_prefix") or "")
     if old_character and name.startswith(old_character + "_"):
         name = name[len(old_character) + 1 :]
     return name or "action"
+
+
+def _selected_item(collection, index, label):
+    if index < 0 or index >= len(collection):
+        raise RuntimeError(f"Select an action from the {label} list first.")
+    return collection[index]
 
 
 def _prepare_target(context, *, auto_fix_axis=True):
@@ -102,7 +114,10 @@ def _save_target_action(context, action_slug, category_slug, *, source_meta=None
     saved_action.name = action_name
     saved_action.use_fake_user = True
     blend_path = action_dir / "action.blend"
-    bpy.data.libraries.write(str(blend_path), {saved_action}, fake_user=True)
+    try:
+        bpy.data.libraries.write(str(blend_path), {saved_action}, fake_user=True)
+    finally:
+        _cleanup_action(saved_action)
 
     meta = {
         "name": action_name,
@@ -167,6 +182,64 @@ def _load_library_action_data(item):
     return action
 
 
+def _copy_library_item_to_current_character(context, item):
+    st = context.scene.rro_bridge
+    meta = _read_meta(item)
+    category = _safe_slug(meta.get("category") or st.action_category)
+    action_slug = _action_slug_from_library_item(item, meta)
+    action_name = _character_action_name(context, action_slug)
+    target_dir = _library_root(context) / "humanoid_mixamo" / category / action_name
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    source_action = _load_library_action_data(item)
+    copied_action = source_action.copy()
+    copied_action.name = action_name
+    copied_action.use_fake_user = True
+    try:
+        bpy.data.libraries.write(str(target_dir / "action.blend"), {copied_action}, fake_user=True)
+    finally:
+        _cleanup_action(copied_action)
+        _cleanup_action(source_action)
+
+    out_meta = dict(meta)
+    out_meta.update(
+        {
+            "name": action_name,
+            "category": category,
+            "character_prefix": _current_character_slug(context),
+            "target": (_target(context).name if _target(context) else ""),
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "adopted_from": {
+                "name": meta.get("name", item.name),
+                "character_prefix": meta.get("character_prefix", item.character_prefix),
+                "category": meta.get("category", item.category),
+            },
+            "adopted_from_path": item.path,
+        }
+    )
+    (target_dir / "meta.json").write_text(json.dumps(out_meta, indent=2), encoding="utf-8")
+    st.action_category = category
+    st.action_name = action_slug
+    return action_name
+
+
+def _delete_library_item(item):
+    meta_path = Path(item.meta_path) if item.meta_path else Path(item.path).with_name("meta.json")
+    action_dir = meta_path.parent
+    root = action_dir.parent.parent.parent
+    if not action_dir.exists():
+        raise RuntimeError(f"Action folder not found: {action_dir}")
+    shutil.rmtree(action_dir)
+    for parent in list(action_dir.parents):
+        if parent == root:
+            break
+        try:
+            next(parent.iterdir())
+            break
+        except StopIteration:
+            parent.rmdir()
+
+
 class ActionLibraryRefresh(bpy.types.Operator):
     bl_idname = "rro_action_library.refresh"
     bl_label = "Refresh Action Library"
@@ -190,23 +263,25 @@ class ActionLibraryRefresh(bpy.types.Operator):
             blend_path = meta_path.parent / "action.blend"
             if not blend_path.exists():
                 continue
-            item = context.scene.rro_action_library_items.add()
-            _fill_item(item, meta, meta_path, blend_path)
-            if _safe_slug(meta.get("character_prefix") or "") == current_character:
+            item_character = _safe_slug(meta.get("character_prefix") or "")
+            if item_character == current_character:
                 character_item = context.scene.rro_character_action_items.add()
                 _fill_item(character_item, meta, meta_path, blend_path)
+            else:
+                item = context.scene.rro_action_library_items.add()
+                _fill_item(item, meta, meta_path, blend_path)
 
         context.scene.rro_bridge.last_status = (
             f"Loaded {len(context.scene.rro_character_action_items)} current-character actions, "
-            f"{len(context.scene.rro_action_library_items)} total"
+            f"{len(context.scene.rro_action_library_items)} resource actions"
         )
         return {"FINISHED"}
 
 
 class ActionLibrarySaveCurrent(bpy.types.Operator):
     bl_idname = "rro_action_library.save_current"
-    bl_label = "Save Current Retarget to Library"
-    bl_description = "Save the target's current retargeted action to the external action library"
+    bl_label = "Send Current Action to Resource Library"
+    bl_description = "Copy the target's current action into the shared resource action library"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -220,9 +295,9 @@ class ActionLibrarySaveCurrent(bpy.types.Operator):
             return {"CANCELLED"}
 
         action_name, blend_path = _save_target_action(context, st.action_name, st.action_category)
-        st.last_status = f"Saved action: {action_name}"
+        st.last_status = f"Sent current action to resource library: {action_name}"
         bpy.ops.rro_action_library.refresh()
-        self.report({"INFO"}, f"Saved action to {blend_path}")
+        self.report({"INFO"}, f"Sent action to resource library: {blend_path}")
         return {"FINISHED"}
 
 
@@ -236,75 +311,79 @@ def _load_library_item(context, item, *, auto_fix_axis=True):
     return action
 
 
-class ActionLibraryLoadSelected(bpy.types.Operator):
-    bl_idname = "rro_action_library.load_selected"
-    bl_label = "Load Selected Action"
-    bl_description = "Load the selected external action and assign it to the current Mixamo target"
-    bl_options = {"REGISTER", "UNDO"}
-
-    def execute(self, context):
-        items = context.scene.rro_action_library_items
-        index = context.scene.rro_action_library_index
-        if index < 0 or index >= len(items):
-            self.report({"ERROR"}, "Select an action from the library list first.")
-            return {"CANCELLED"}
-
-        try:
-            action = _load_library_item(context, items[index])
-        except Exception as exc:
-            self.report({"ERROR"}, str(exc))
-            return {"CANCELLED"}
-        self.report({"INFO"}, f"Loaded action {action.name}")
-        return {"FINISHED"}
-
-
-class ActionLibraryApplySelectedToCharacter(bpy.types.Operator):
-    bl_idname = "rro_action_library.apply_selected_to_character"
-    bl_label = "Apply to Current Character"
-    bl_description = "Load the selected library action onto the current Mixamo target and save it under Current Character Actions"
+class ActionLibrarySendSelectedToCharacter(bpy.types.Operator):
+    bl_idname = "rro_action_library.send_selected_to_character"
+    bl_label = "Send to Current Model"
+    bl_description = "Copy the selected resource action into the current model action library"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
         st = context.scene.rro_bridge
-        items = context.scene.rro_action_library_items
-        index = context.scene.rro_action_library_index
-        if index < 0 or index >= len(items):
-            self.report({"ERROR"}, "Select an action from the library list first.")
-            return {"CANCELLED"}
-
-        item = items[index]
-        meta = _read_meta(item)
-        category = _safe_slug(meta.get("category") or st.action_category)
-        action_slug = _action_slug_from_library_item(item, meta)
 
         try:
+            item = _selected_item(context.scene.rro_action_library_items, context.scene.rro_action_library_index, "resource action")
+            action_name = _copy_library_item_to_current_character(context, item)
+            bpy.ops.rro_action_library.refresh()
+        except Exception as exc:
+            st.last_status = f"Error: {exc}"
+            self.report({"ERROR"}, str(exc))
+            return {"CANCELLED"}
+        st.last_status = f"Sent resource action to current model: {action_name}"
+        self.report({"INFO"}, f"Sent to current model: {action_name}")
+        return {"FINISHED"}
+
+
+class ActionLibraryDeleteSelected(bpy.types.Operator):
+    bl_idname = "rro_action_library.delete_selected"
+    bl_label = "Delete Resource Action"
+    bl_description = "Delete the selected action from the resource action library"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        st = context.scene.rro_bridge
+        try:
+            item = _selected_item(context.scene.rro_action_library_items, context.scene.rro_action_library_index, "resource action")
+            name = item.name
+            _delete_library_item(item)
+            bpy.ops.rro_action_library.refresh()
+        except Exception as exc:
+            st.last_status = f"Error: {exc}"
+            self.report({"ERROR"}, str(exc))
+            return {"CANCELLED"}
+        st.last_status = f"Deleted resource action: {name}"
+        self.report({"INFO"}, f"Deleted {name}")
+        return {"FINISHED"}
+
+
+class ActionLibraryRetargetCharacterSelected(bpy.types.Operator):
+    bl_idname = "rro_action_library.retarget_character_selected"
+    bl_label = "Retarget Selected"
+    bl_description = "Use the selected current-model action as the source, then build bone list, check target axis, and retarget to the selected Mixamo target"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        st = context.scene.rro_bridge
+        try:
+            item = _selected_item(context.scene.rro_character_action_items, context.scene.rro_character_action_index, "current model action")
+            meta = _read_meta(item)
+            action_slug = _action_slug_from_library_item(item, meta)
             action = _load_library_action_data(item)
             source = _duplicate_target_as_source(context, action, action_slug)
             bridge.run_bind_workflow(context, source, auto_fix_axis=True, delete_source=True)
-            action_name, _blend_path = _save_target_action(
-                context,
-                action_slug,
-                category,
-                source_meta=meta,
-                source_item=item,
-            )
         except Exception as exc:
             st.last_status = f"Error: {exc}"
             self.report({"ERROR"}, str(exc))
             return {"CANCELLED"}
 
-        st.action_category = category
-        st.action_name = action_slug
-        st.last_status = f"Applied and saved for current character: {action_name}"
-        bpy.ops.rro_action_library.refresh()
-        self.report({"INFO"}, f"Applied and saved {action_name}")
+        st.last_status = f"Retargeted current model action: {item.name}"
+        self.report({"INFO"}, f"Retargeted {item.name}")
         return {"FINISHED"}
 
 
 class ActionLibraryLoadCharacterSelected(bpy.types.Operator):
     bl_idname = "rro_action_library.load_character_selected"
-    bl_label = "Load Current Character Action"
-    bl_description = "Load the selected action saved for the current character"
+    bl_label = "Show Selected Action"
+    bl_description = "Load the selected current-model action onto the target for preview"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):

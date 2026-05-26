@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.9.0
+
+- Simplify action library UI into `Current Model Action Library` and `Resource Action Library`.
+- Make resource actions separate from current-model actions in the lists.
+- Add `Send to Current Model` and `Delete` buttons to the resource library.
+- Keep current-model actions focused on `Send Current Action to Resource Library`, `Show Selected Action`, and `Retarget Selected`.
+- Remove the overloaded resource-library apply/load workflow.
+- Fix one-click bind status reporting when source armatures are deleted after retarget.
+
 ## 1.4.8.0
 
 - Make `Apply to Current Character` retarget through the Rokoko workflow instead of directly assigning an Action.

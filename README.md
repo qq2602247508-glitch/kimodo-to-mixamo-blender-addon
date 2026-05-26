@@ -29,7 +29,7 @@ The addon keeps the working Rokoko retarget algorithm, removes the login/cloud w
 
 ## Install
 
-1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_8_0_retarget_library_actions.zip`.
+1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_9_0_simplified_action_libraries.zip`.
 2. In Blender, open `Edit > Preferences > Add-ons`.
 3. Click `Install...`.
 4. Select the zip file.
@@ -96,74 +96,31 @@ Use this when you manually send a BVH from Kimodo/Viser to Blender.
 
 The addon will bind the current/last BVH source to the selected Mixamo target.
 
-### Save Current Action to External Library
+### Current Model Action Library
 
-Use this after a retargeted action looks good.
+This page is for the selected Mixamo model only. A newly imported model starts with an empty current-model library.
 
-1. Set the addon's `Action Library` preference to an external folder, for example:
-
-```text
-E:\400-game assets\ai\kimodo\action_library
-```
-
-2. Open `Current Character Actions`.
-3. Set:
-
-- `Character ID`: optional. Leave empty to use the selected `Mixamo Target` name, or type a stable character id such as `hero`.
-- `Category`: for example `idle`, `locomotion`, `jump`, `combat`
-- `Action Name`: for example `idle_01`, `walk_forward_01`, `run_forward_01`
-
-4. Click `Save Current Retarget to Library`.
-
-The addon saves:
-
-```text
-action_library/
-  humanoid_mixamo/
-    locomotion/
-      hero_walk_forward_01/
-        action.blend
-        meta.json
-```
-
-The `action.blend` stores the Blender Action datablock. The `meta.json` stores prompt, seed, duration, source BVH path, target name, and creation time.
-
-### Current Character Actions
-
-Use this page for the character you are currently working on.
-
-1. Select the character in `Mixamo Target`.
+1. Select the model in `Mixamo Target`.
 2. Click `Refresh`.
-3. The list shows only actions whose saved `Character ID` matches the current target or the typed `Character ID`.
-4. Select an action and click `Load Current Character Action`.
+3. Use `Send Current Action to Resource Library` after a generated/retargeted action looks good.
+4. Use `Show Selected Action` to preview the selected current-model action.
+5. Use `Retarget Selected` to run the one-click retarget workflow:
 
-This solves the multi-character scene problem: one-click bind and library load use the explicit `Mixamo Target` from the Kimodo Bridge panel, not the first Mixamo armature in the scene.
+```text
+Build Bone List -> Check/Fix Target Axis -> Retarget
+```
 
-### Action Library
+The retarget target is the armature or mesh selected in `Mixamo Target`.
 
-Use this page to browse every saved action in the external library.
+### Resource Action Library
 
-1. Open `Action Library`.
-2. Confirm `Action Library` points to the folder that contains saved actions.
-3. Click `Refresh Action Library`.
-4. Select an action in the list.
-5. Click `Load Selected Action`.
+This page is the shared action resource library.
 
-The selected Action is loaded from the external `.blend` file and assigned to the current Mixamo target.
+1. Select a resource action.
+2. Click `Send to Current Model` to copy it into the selected model's current-model library.
+3. Click `Delete` to remove the selected resource action from disk.
 
-### Apply Library Action to a New Character
-
-Use this when you import a fresh Mixamo character and want to give it an existing library action.
-
-1. Select the new character in `Mixamo Target`.
-2. Open `Action Library`.
-3. Click `Refresh Action Library`.
-4. Select any saved action.
-5. Click `Apply to Current Character`.
-
-The addon loads the selected action onto the current Mixamo target, checks/fixes the target axis when possible, then saves a copy under `Current Character Actions` using the current target's `Character ID`.
-
-Internally this uses the retarget workflow: the addon creates a temporary source armature from the selected library Action, rebuilds the bone list, checks/fixes the target axis, retargets to the current Mixamo target, saves the result for the current character, and deletes the temporary source when finished.
+Resource actions and current-model actions are shown in separate lists, so a new model has a clean empty current-model library until you send actions into it.
 
 ### Manual Tools
 
