@@ -131,6 +131,42 @@ def _save_target_action(context, action_slug, category_slug, *, source_meta=None
     return action_name, blend_path
 
 
+def _duplicate_target_as_source(context, action, name_slug):
+    target = _prepare_target(context, auto_fix_axis=True)
+    source = target.copy()
+    source.data = target.data.copy()
+    source.name = f"LibrarySource_{name_slug}"
+    source.data.name = f"{source.name}_Armature"
+    source.animation_data_clear()
+    source.animation_data_create()
+    source.animation_data.action = action
+    source.hide_viewport = True
+    source.hide_render = True
+
+    collection = bpy.data.collections.get("Kimodo Library Sources")
+    if collection is None:
+        collection = bpy.data.collections.new("Kimodo Library Sources")
+        context.scene.collection.children.link(collection)
+    collection.objects.link(source)
+    return source
+
+
+def _load_library_action_data(item):
+    blend_path = Path(item.path)
+    if not blend_path.exists():
+        raise RuntimeError(f"Action file not found: {blend_path}")
+
+    with bpy.data.libraries.load(str(blend_path), link=False) as (data_from, data_to):
+        data_to.actions = list(data_from.actions)
+
+    if not data_to.actions:
+        raise RuntimeError("No action found in selected library file.")
+
+    action = data_to.actions[0]
+    action.use_fake_user = True
+    return action
+
+
 class ActionLibraryRefresh(bpy.types.Operator):
     bl_idname = "rro_action_library.refresh"
     bl_label = "Refresh Action Library"
@@ -192,18 +228,7 @@ class ActionLibrarySaveCurrent(bpy.types.Operator):
 
 def _load_library_item(context, item, *, auto_fix_axis=True):
     target = _prepare_target(context, auto_fix_axis=auto_fix_axis)
-    blend_path = Path(item.path)
-    if not blend_path.exists():
-        raise RuntimeError(f"Action file not found: {blend_path}")
-
-    with bpy.data.libraries.load(str(blend_path), link=False) as (data_from, data_to):
-        data_to.actions = list(data_from.actions)
-
-    if not data_to.actions:
-        raise RuntimeError("No action found in selected library file.")
-
-    action = data_to.actions[0]
-    action.use_fake_user = True
+    action = _load_library_action_data(item)
     if target.animation_data is None:
         target.animation_data_create()
     target.animation_data.action = action
@@ -253,7 +278,9 @@ class ActionLibraryApplySelectedToCharacter(bpy.types.Operator):
         action_slug = _action_slug_from_library_item(item, meta)
 
         try:
-            _load_library_item(context, item)
+            action = _load_library_action_data(item)
+            source = _duplicate_target_as_source(context, action, action_slug)
+            bridge.run_bind_workflow(context, source, auto_fix_axis=True, delete_source=True)
             action_name, _blend_path = _save_target_action(
                 context,
                 action_slug,

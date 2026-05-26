@@ -49,12 +49,24 @@ def _set_active(obj):
     bpy.context.view_layer.objects.active = obj
 
 
+def delete_object_tree(obj):
+    if obj is None or obj.name not in bpy.data.objects:
+        return
+    children = list(obj.children)
+    for child in children:
+        delete_object_tree(child)
+    data = obj.data
+    bpy.data.objects.remove(obj, do_unlink=True)
+    if data and data.users == 0 and isinstance(data, bpy.types.Armature):
+        bpy.data.armatures.remove(data)
+
+
 def _target_for_scene(scene):
     st = settings()
     return _armature_from_object(st.target_object)
 
 
-def run_bind_workflow(context, source=None, *, auto_fix_axis=True):
+def run_bind_workflow(context, source=None, *, auto_fix_axis=True, delete_source=None):
     scene = context.scene
     st = settings(context)
     source = source or scene.rsl_retargeting_armature_source
@@ -80,14 +92,25 @@ def run_bind_workflow(context, source=None, *, auto_fix_axis=True):
     fixed_mappings = mixamo_tools.force_mixamo_bone_map(scene)
     bpy.ops.rsl.retarget_animation()
 
+    should_delete_source = st.delete_source_after_retarget if delete_source is None else delete_source
+    source_name = source.name
+    source_deleted = False
+    if should_delete_source and source != target:
+        scene.rsl_retargeting_armature_source = None
+        delete_object_tree(source)
+        st.last_source_name = ""
+        source_deleted = True
+
     axis_text = ", axis fixed" if axis_fixed else ""
     map_text = f", {fixed_mappings} mappings fixed" if fixed_mappings else ""
-    st.last_status = f"Bound {source.name} to {target.name}{axis_text}{map_text}"
+    delete_text = ", source deleted" if source_deleted else ""
+    st.last_status = f"Bound {source_name} to {target.name}{axis_text}{map_text}{delete_text}"
     return {
-        "source": source,
+        "source": None if source_deleted else source,
         "target": target,
         "axis_fixed": axis_fixed,
         "fixed_mappings": fixed_mappings,
+        "source_deleted": source_deleted,
     }
 
 

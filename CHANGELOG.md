@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.8.0
+
+- Make `Apply to Current Character` retarget through the Rokoko workflow instead of directly assigning an Action.
+- Create a temporary source armature for library actions, rebuild the bone list, check/fix target axis, retarget, save to current character, then delete the temporary source.
+- Add `Delete Source After Retarget`, enabled by default, to remove generated/imported BVH source armatures after successful retarget.
+
 ## 1.4.7.0
 
 - Add `Action Library` to Blender Add-on Preferences.

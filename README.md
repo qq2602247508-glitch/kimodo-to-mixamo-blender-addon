@@ -29,7 +29,7 @@ The addon keeps the working Rokoko retarget algorithm, removes the login/cloud w
 
 ## Install
 
-1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_7_0_addon_preferences.zip`.
+1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_8_0_retarget_library_actions.zip`.
 2. In Blender, open `Edit > Preferences > Add-ons`.
 3. Click `Install...`.
 4. Select the zip file.
@@ -61,6 +61,7 @@ Main fields:
 
 - `Port`: Blender receiver port. Default: `8765`.
 - `Mixamo Target`: your target Mixamo armature or mesh.
+- `Delete Source After Retarget`: remove generated/imported BVH source armatures after successful retarget. Enabled by default.
 - `Kimodo URL`: local Kimodo command API. Default: `http://127.0.0.1:7870`.
 - `Prompt`: motion prompt to generate.
 - `Duration`: generated motion duration.
@@ -161,6 +162,8 @@ Use this when you import a fresh Mixamo character and want to give it an existin
 5. Click `Apply to Current Character`.
 
 The addon loads the selected action onto the current Mixamo target, checks/fixes the target axis when possible, then saves a copy under `Current Character Actions` using the current target's `Character ID`.
+
+Internally this uses the retarget workflow: the addon creates a temporary source armature from the selected library Action, rebuilds the bone list, checks/fixes the target axis, retargets to the current Mixamo target, saves the result for the current character, and deletes the temporary source when finished.
 
 ### Manual Tools
 

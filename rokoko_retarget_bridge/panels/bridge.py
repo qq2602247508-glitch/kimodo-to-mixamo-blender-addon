@@ -25,6 +25,7 @@ class BridgePanel(ToolPanel, bpy.types.Panel):
         box.prop(st, "auto_start")
         box.prop(st, "target_object")
         box.prop(st, "auto_retarget_on_receive")
+        box.prop(st, "delete_source_after_retarget")
         box.prop(st, "bvh_scale")
 
         row = box.row(align=True)

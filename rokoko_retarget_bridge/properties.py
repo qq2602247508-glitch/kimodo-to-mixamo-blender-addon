@@ -18,6 +18,11 @@ class RROBridgeSettings(bpy.types.PropertyGroup):
         poll=bridge.poll_target_object,
     )
     auto_retarget_on_receive: bpy.props.BoolProperty(name="Auto Retarget on Receive", default=True)
+    delete_source_after_retarget: bpy.props.BoolProperty(
+        name="Delete Source After Retarget",
+        description="Remove imported BVH/library source armatures after a successful retarget",
+        default=True,
+    )
     kimodo_url: bpy.props.StringProperty(name="Kimodo URL", default="http://127.0.0.1:7870")
     kimodo_start_script: bpy.props.StringProperty(
         name="Start Script",
