@@ -65,4 +65,6 @@ class ActionLibraryPanel(ToolPanel, bpy.types.Panel):
             "rro_action_library_index",
             rows=5,
         )
-        box.operator("rro_action_library.load_selected", icon="ACTION")
+        row = box.row(align=True)
+        row.operator("rro_action_library.load_selected", icon="ACTION")
+        row.operator("rro_action_library.apply_selected_to_character", icon="FILE_TICK")

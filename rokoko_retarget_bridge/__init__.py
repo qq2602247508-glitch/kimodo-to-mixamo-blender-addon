@@ -4,7 +4,7 @@ bl_info = {
     "category": "Animation",
     "location": "View 3D > Sidebar > Rokoko",
     "description": "Original Rokoko retargeting UI with Kimodo BVH Bridge, without login or cloud features.",
-    "version": (1, 4, 5, 0),
+    "version": (1, 4, 6, 0),
     "blender": (2, 80, 0),
 }
 
@@ -15,6 +15,7 @@ from . import bridge
 from . import core
 from . import properties
 from .operators.action_library import (
+    ActionLibraryApplySelectedToCharacter,
     ActionLibraryLoadCharacterSelected,
     ActionLibraryLoadSelected,
     ActionLibraryRefresh,
@@ -78,6 +79,7 @@ classes = [
     BridgeStartKimodo,
     ActionLibraryRefresh,
     ActionLibrarySaveCurrent,
+    ActionLibraryApplySelectedToCharacter,
     ActionLibraryLoadCharacterSelected,
     ActionLibraryLoadSelected,
 ]

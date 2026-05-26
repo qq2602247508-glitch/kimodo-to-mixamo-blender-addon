@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.6.0
+
+- Add `Apply to Current Character` in the full `Action Library` panel.
+- Allow a fresh Mixamo target to load any existing library action and immediately save it under `Current Character Actions`.
+- Check/fix the current Mixamo target axis before loading an external library action when possible.
+- Record source library metadata in `meta.json` when an action is adopted from the full library.
+
 ## 1.4.5.0
 
 - Split the action library UI into `Current Character Actions` and `Action Library`.

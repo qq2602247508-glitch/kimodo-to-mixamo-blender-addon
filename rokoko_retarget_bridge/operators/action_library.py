@@ -5,7 +5,7 @@ from pathlib import Path
 
 import bpy
 
-from .. import bridge
+from .. import bridge, mixamo_tools
 
 
 def _safe_slug(text):
@@ -26,9 +26,7 @@ def _library_root(context):
 
 
 def _make_action_name(st):
-    prefix = _current_character_slug(bpy.context)
-    action = _safe_slug(st.action_name)
-    return f"{prefix}_{action}"
+    return _character_action_name(bpy.context, st.action_name)
 
 
 def _current_character_slug(context):
@@ -47,6 +45,89 @@ def _fill_item(item, meta, meta_path, blend_path):
     item.category = meta.get("category") or ""
     item.path = str(blend_path)
     item.meta_path = str(meta_path)
+
+
+def _read_meta(item):
+    if not item.meta_path:
+        return {}
+    meta_path = Path(item.meta_path)
+    if not meta_path.exists():
+        return {}
+    try:
+        return json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _character_action_name(context, action_name):
+    return f"{_current_character_slug(context)}_{_safe_slug(action_name)}"
+
+
+def _action_slug_from_library_item(item, meta):
+    name = _safe_slug(meta.get("name") or item.name)
+    old_character = _safe_slug(meta.get("character_prefix") or "")
+    if old_character and name.startswith(old_character + "_"):
+        name = name[len(old_character) + 1 :]
+    return name or "action"
+
+
+def _prepare_target(context, *, auto_fix_axis=True):
+    target = _target(context)
+    if target is None:
+        raise RuntimeError("Please select a Mixamo Target first.")
+
+    context.scene.rsl_retargeting_armature_target = target
+    axis = mixamo_tools.analyze_target_axis(target)
+    if not axis["ok"] and auto_fix_axis:
+        fixed_axis = mixamo_tools.fix_target_axis(target)
+        if not fixed_axis["ok"] and not fixed_axis.get("fixed"):
+            raise RuntimeError("Target axis is abnormal and cannot be fixed automatically: " + fixed_axis["status"])
+    return target
+
+
+def _save_target_action(context, action_slug, category_slug, *, source_meta=None, source_item=None):
+    st = context.scene.rro_bridge
+    target = _prepare_target(context, auto_fix_axis=False)
+    if not target.animation_data or not target.animation_data.action:
+        raise RuntimeError("Target has no current action to save.")
+
+    action_name = _character_action_name(context, action_slug)
+    category = _safe_slug(category_slug)
+    root = _library_root(context)
+    action_dir = root / "humanoid_mixamo" / category / action_name
+    action_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_action = target.animation_data.action.copy()
+    saved_action.name = action_name
+    saved_action.use_fake_user = True
+    blend_path = action_dir / "action.blend"
+    bpy.data.libraries.write(str(blend_path), {saved_action}, fake_user=True)
+
+    meta = {
+        "name": action_name,
+        "category": category,
+        "character_prefix": _current_character_slug(context),
+        "prompt": st.prompt,
+        "seed": st.prompt_seed,
+        "duration": st.prompt_duration,
+        "diffusion_steps": st.prompt_diffusion_steps,
+        "target": target.name,
+        "source_bvh": st.last_bvh_path,
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "rig": "mixamo",
+    }
+    if source_meta:
+        meta["adopted_from"] = {
+            "name": source_meta.get("name", ""),
+            "character_prefix": source_meta.get("character_prefix", ""),
+            "category": source_meta.get("category", ""),
+        }
+    if source_item is not None:
+        meta["adopted_from_path"] = source_item.path
+
+    meta_path = action_dir / "meta.json"
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    return action_name, blend_path
 
 
 class ActionLibraryRefresh(bpy.types.Operator):
@@ -101,45 +182,15 @@ class ActionLibrarySaveCurrent(bpy.types.Operator):
             self.report({"ERROR"}, "Target has no current action to save.")
             return {"CANCELLED"}
 
-        action_name = _make_action_name(st)
-        category = _safe_slug(st.action_category)
-        root = _library_root(context)
-        action_dir = root / "humanoid_mixamo" / category / action_name
-        action_dir.mkdir(parents=True, exist_ok=True)
-
-        saved_action = target.animation_data.action.copy()
-        saved_action.name = action_name
-        saved_action.use_fake_user = True
-        blend_path = action_dir / "action.blend"
-        bpy.data.libraries.write(str(blend_path), {saved_action}, fake_user=True)
-
-        meta = {
-            "name": action_name,
-            "category": category,
-            "character_prefix": _current_character_slug(context),
-            "prompt": st.prompt,
-            "seed": st.prompt_seed,
-            "duration": st.prompt_duration,
-            "diffusion_steps": st.prompt_diffusion_steps,
-            "target": target.name,
-            "source_bvh": st.last_bvh_path,
-            "created_at": datetime.now().isoformat(timespec="seconds"),
-            "rig": "mixamo",
-        }
-        meta_path = action_dir / "meta.json"
-        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-
+        action_name, blend_path = _save_target_action(context, st.action_name, st.action_category)
         st.last_status = f"Saved action: {action_name}"
         bpy.ops.rro_action_library.refresh()
         self.report({"INFO"}, f"Saved action to {blend_path}")
         return {"FINISHED"}
 
 
-def _load_library_item(context, item):
-    target = _target(context)
-    if target is None:
-        raise RuntimeError("Please select a Mixamo Target first.")
-
+def _load_library_item(context, item, *, auto_fix_axis=True):
+    target = _prepare_target(context, auto_fix_axis=auto_fix_axis)
     blend_path = Path(item.path)
     if not blend_path.exists():
         raise RuntimeError(f"Action file not found: {blend_path}")
@@ -178,6 +229,47 @@ class ActionLibraryLoadSelected(bpy.types.Operator):
             self.report({"ERROR"}, str(exc))
             return {"CANCELLED"}
         self.report({"INFO"}, f"Loaded action {action.name}")
+        return {"FINISHED"}
+
+
+class ActionLibraryApplySelectedToCharacter(bpy.types.Operator):
+    bl_idname = "rro_action_library.apply_selected_to_character"
+    bl_label = "Apply to Current Character"
+    bl_description = "Load the selected library action onto the current Mixamo target and save it under Current Character Actions"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        st = context.scene.rro_bridge
+        items = context.scene.rro_action_library_items
+        index = context.scene.rro_action_library_index
+        if index < 0 or index >= len(items):
+            self.report({"ERROR"}, "Select an action from the library list first.")
+            return {"CANCELLED"}
+
+        item = items[index]
+        meta = _read_meta(item)
+        category = _safe_slug(meta.get("category") or st.action_category)
+        action_slug = _action_slug_from_library_item(item, meta)
+
+        try:
+            _load_library_item(context, item)
+            action_name, _blend_path = _save_target_action(
+                context,
+                action_slug,
+                category,
+                source_meta=meta,
+                source_item=item,
+            )
+        except Exception as exc:
+            st.last_status = f"Error: {exc}"
+            self.report({"ERROR"}, str(exc))
+            return {"CANCELLED"}
+
+        st.action_category = category
+        st.action_name = action_slug
+        st.last_status = f"Applied and saved for current character: {action_name}"
+        bpy.ops.rro_action_library.refresh()
+        self.report({"INFO"}, f"Applied and saved {action_name}")
         return {"FINISHED"}
 
 

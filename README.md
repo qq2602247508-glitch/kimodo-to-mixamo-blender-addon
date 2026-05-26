@@ -29,7 +29,7 @@ The addon keeps the working Rokoko retarget algorithm, removes the login/cloud w
 
 ## Install
 
-1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_5_0_character_actions.zip`.
+1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_6_0_apply_library_action.zip`.
 2. In Blender, open `Edit > Preferences > Add-ons`.
 3. Click `Install...`.
 4. Select the zip file.
@@ -148,6 +148,18 @@ Use this page to browse every saved action in the external library.
 5. Click `Load Selected Action`.
 
 The selected Action is loaded from the external `.blend` file and assigned to the current Mixamo target.
+
+### Apply Library Action to a New Character
+
+Use this when you import a fresh Mixamo character and want to give it an existing library action.
+
+1. Select the new character in `Mixamo Target`.
+2. Open `Action Library`.
+3. Click `Refresh Action Library`.
+4. Select any saved action.
+5. Click `Apply to Current Character`.
+
+The addon loads the selected action onto the current Mixamo target, checks/fixes the target axis when possible, then saves a copy under `Current Character Actions` using the current target's `Character ID`.
 
 ### Manual Tools
 
