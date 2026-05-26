@@ -21,7 +21,8 @@ def _target(context):
 
 
 def _library_root(context):
-    path = bpy.path.abspath(context.scene.rro_bridge.action_library_path)
+    addon = bpy.context.preferences.addons.get(__package__.split(".")[0])
+    path = addon.preferences.action_library_path if addon else context.scene.rro_bridge.action_library_path
     return Path(path)
 
 

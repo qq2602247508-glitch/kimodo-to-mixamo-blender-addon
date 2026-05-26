@@ -3,6 +3,11 @@ import bpy
 from .main import ToolPanel
 
 
+def _addon_preferences(context):
+    addon = context.preferences.addons.get(__package__.split(".")[0])
+    return addon.preferences if addon else None
+
+
 class CurrentCharacterActionsPanel(ToolPanel, bpy.types.Panel):
     bl_idname = "VIEW3D_PT_rro_current_character_actions"
     bl_label = "Current Character Actions"
@@ -11,11 +16,15 @@ class CurrentCharacterActionsPanel(ToolPanel, bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         st = context.scene.rro_bridge
+        prefs = _addon_preferences(context)
 
         box = layout.box()
         box.label(text="Current Character")
         box.prop(st, "target_object")
         box.prop(st, "character_prefix")
+
+        if prefs:
+            box.prop(prefs, "action_library_path")
 
         box = layout.box()
         box.label(text="Save Current Action")
@@ -47,11 +56,12 @@ class ActionLibraryPanel(ToolPanel, bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        st = context.scene.rro_bridge
+        prefs = _addon_preferences(context)
 
         box = layout.box()
         box.label(text="External Library")
-        box.prop(st, "action_library_path")
+        if prefs:
+            box.prop(prefs, "action_library_path")
         box.operator("rro_action_library.refresh", icon="FILE_REFRESH")
 
         box = layout.box()

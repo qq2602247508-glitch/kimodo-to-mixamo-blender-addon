@@ -29,12 +29,13 @@ The addon keeps the working Rokoko retarget algorithm, removes the login/cloud w
 
 ## Install
 
-1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_6_0_apply_library_action.zip`.
+1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_7_0_addon_preferences.zip`.
 2. In Blender, open `Edit > Preferences > Add-ons`.
 3. Click `Install...`.
 4. Select the zip file.
 5. Enable `Rokoko Retarget Bridge`.
-6. Open the 3D View sidebar, then the `Rokoko` tab.
+6. Open the addon's preferences and set `Action Library` to your external action library folder.
+7. Open the 3D View sidebar, then the `Rokoko` tab.
 
 ## Required Local Kimodo Patch
 
@@ -98,13 +99,13 @@ The addon will bind the current/last BVH source to the selected Mixamo target.
 
 Use this after a retargeted action looks good.
 
-1. Open `Current Character Actions`.
-2. Set `Action Library` to an external folder, for example:
+1. Set the addon's `Action Library` preference to an external folder, for example:
 
 ```text
 E:\400-game assets\ai\kimodo\action_library
 ```
 
+2. Open `Current Character Actions`.
 3. Set:
 
 - `Character ID`: optional. Leave empty to use the selected `Mixamo Target` name, or type a stable character id such as `hero`.
@@ -142,7 +143,7 @@ This solves the multi-character scene problem: one-click bind and library load u
 Use this page to browse every saved action in the external library.
 
 1. Open `Action Library`.
-2. Set `Action Library` to the folder that contains saved actions.
+2. Confirm `Action Library` points to the folder that contains saved actions.
 3. Click `Refresh Action Library`.
 4. Select an action in the list.
 5. Click `Load Selected Action`.

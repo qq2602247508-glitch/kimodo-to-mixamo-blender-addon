@@ -4,7 +4,7 @@ bl_info = {
     "category": "Animation",
     "location": "View 3D > Sidebar > Rokoko",
     "description": "Original Rokoko retargeting UI with Kimodo BVH Bridge, without login or cloud features.",
-    "version": (1, 4, 6, 0),
+    "version": (1, 4, 7, 0),
     "blender": (2, 80, 0),
 }
 
@@ -49,7 +49,23 @@ from .panels.retargeting import BoneListItem, RetargetingPanel, RSL_UL_BoneList
 absolute_min_ver = (2, 80, 75)
 
 
+class RokokoRetargetBridgePreferences(bpy.types.AddonPreferences):
+    bl_idname = __name__
+
+    action_library_path: bpy.props.StringProperty(
+        name="Action Library",
+        description="External folder used by Current Character Actions and Action Library",
+        default=r"E:\400-game assets\ai\kimodo\action_library",
+        subtype="DIR_PATH",
+    )
+
+    def draw(self, _context):
+        layout = self.layout
+        layout.prop(self, "action_library_path")
+
+
 classes = [
+    RokokoRetargetBridgePreferences,
     RetargetingPanel,
     BridgePanel,
     CurrentCharacterActionsPanel,

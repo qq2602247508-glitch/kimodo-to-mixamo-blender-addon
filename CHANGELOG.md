@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.7.0
+
+- Add `Action Library` to Blender Add-on Preferences.
+- Store the external action library path at addon/user-preference level instead of per `.blend` scene.
+- Keep the action library path editable from the sidebar panels while using the same global preference.
+
 ## 1.4.6.0
 
 - Add `Apply to Current Character` in the full `Action Library` panel.
