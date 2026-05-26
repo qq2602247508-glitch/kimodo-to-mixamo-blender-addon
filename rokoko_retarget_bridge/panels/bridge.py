@@ -15,7 +15,7 @@ class BridgePanel(ToolPanel, bpy.types.Panel):
 
         box = layout.box()
         box.label(text="Receiver")
-        row = layout.row(align=True)
+        row = box.row(align=True)
         row.prop(st, "port")
         if bridge.is_running():
             row.operator("rro_bridge.stop", text="", icon="PAUSE")
@@ -25,7 +25,6 @@ class BridgePanel(ToolPanel, bpy.types.Panel):
         box.prop(st, "auto_start")
         box.prop(st, "target_object")
         box.prop(st, "auto_retarget_on_receive")
-        box.prop(st, "delete_source_after_retarget")
         box.prop(st, "bvh_scale")
 
         row = box.row(align=True)
@@ -36,13 +35,34 @@ class BridgePanel(ToolPanel, bpy.types.Panel):
         box.prop(st, "kimodo_url")
         box.prop(st, "kimodo_start_script")
         box.operator("rro_bridge.start_kimodo", icon="URL")
-        box.prop(st, "prompt")
+
+        header = box.row(align=True)
+        header.label(text="Timeline Prompt Segments")
+        header.operator("rro_bridge.add_prompt_segment", text="", icon="ADD")
+
+        if len(context.scene.rro_prompt_segments) == 0:
+            box.prop(st, "prompt")
+            box.prop(st, "prompt_duration")
+        else:
+            labels = box.row(align=True)
+            labels.label(text="Start")
+            labels.label(text="End")
+            labels.label(text="Prompt")
+            labels.label(text="")
+
+            for index, segment in enumerate(context.scene.rro_prompt_segments):
+                row = box.row(align=True)
+                row.prop(segment, "start", text="")
+                row.prop(segment, "end", text="")
+                row.prop(segment, "prompt", text="")
+                op = row.operator("rro_bridge.remove_prompt_segment", text="", icon="REMOVE")
+                op.index = index
+
         row = box.row(align=True)
-        row.prop(st, "prompt_duration")
         row.prop(st, "prompt_seed")
-        box.prop(st, "prompt_diffusion_steps")
+        row.prop(st, "prompt_diffusion_steps")
         box.operator("rro_bridge.generate_prompt", icon="PLAY")
-        box.operator("rro_bridge.one_click_generate_bind", icon="AUTO")
+        box.operator("rro_bridge.one_click_generate_bind", icon="CON_ARMATURE")
         box.operator("rro_bridge.one_click_bind_last", icon="CON_ARMATURE")
 
         if st.last_status:

@@ -5,3 +5,16 @@ __pycache__/
 Thumbs.db
 *.blend1
 *.log
+
+# Local-only Kimodo/model/runtime data. Do not commit.
+kimodo-src/
+models/
+Meta-Llama-3-8B-Instruct/
+outputs/
+logs/
+.venv*/
+.uv-cache*/
+.npm-cache/
+
+# Generated scratch packages except curated dist zips.
+*_backup*/

@@ -6,6 +6,42 @@ import urllib.request
 from .. import bridge
 
 
+def prompt_payload(context):
+    st = context.scene.rro_bridge
+    segments = []
+    for item in context.scene.rro_prompt_segments:
+        prompt = item.prompt.strip()
+        if not prompt:
+            continue
+        segments.append({"start": item.start, "end": item.end, "prompt": prompt})
+
+    if segments:
+        segments.sort(key=lambda item: item["start"])
+        last_end = None
+        for index, segment in enumerate(segments):
+            if segment["end"] <= segment["start"]:
+                raise ValueError(f"Prompt segment {index + 1}: end time must be greater than start time.")
+            if last_end is not None and segment["start"] < last_end:
+                raise ValueError(f"Prompt segment {index + 1}: start time overlaps the previous segment.")
+            last_end = segment["end"]
+        return {
+            "prompt": segments[0]["prompt"],
+            "duration": max(segment["end"] for segment in segments),
+            "segments": segments,
+            "seed": st.prompt_seed,
+            "diffusion_steps": st.prompt_diffusion_steps,
+            "blender_url": f"http://127.0.0.1:{st.port}",
+        }
+
+    return {
+        "prompt": st.prompt,
+        "duration": st.prompt_duration,
+        "seed": st.prompt_seed,
+        "diffusion_steps": st.prompt_diffusion_steps,
+        "blender_url": f"http://127.0.0.1:{st.port}",
+    }
+
+
 class BridgeStart(bpy.types.Operator):
     bl_idname = "rro_bridge.start"
     bl_label = "Start Bridge"
@@ -37,41 +73,35 @@ class BridgeUseRokokoTarget(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        target = bridge._armature_from_object(context.object)
+        target = context.scene.rsl_retargeting_armature_target
         if target is None:
-            target = context.scene.rsl_retargeting_armature_target
-        if target is None:
-            self.report({"ERROR"}, "Select a Mixamo armature or mesh first")
+            self.report({"ERROR"}, "Choose a target in the Rokoko Retargeting panel first")
             return {"CANCELLED"}
         context.scene.rro_bridge.target_object = target
-        context.scene.rsl_retargeting_armature_target = target
         self.report({"INFO"}, f"Bridge target set to {target.name}")
         return {"FINISHED"}
 
 
 class BridgeGeneratePrompt(bpy.types.Operator):
     bl_idname = "rro_bridge.generate_prompt"
-    bl_label = "Generate and Retarget"
-    bl_description = "Send the prompt to local Kimodo, then receive the generated standard T-pose BVH"
+    bl_label = "Generate and Send BVH"
+    bl_description = "Send the prompt to local Kimodo, then receive the generated standard T-pose BVH without retargeting"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
         st = context.scene.rro_bridge
+        previous_auto_retarget = st.auto_retarget_on_receive
+        st.auto_retarget_on_receive = False
         if not bridge.is_running():
             try:
                 bridge.start_server(st.port)
             except Exception as exc:
+                st.auto_retarget_on_receive = previous_auto_retarget
                 self.report({"ERROR"}, f"Could not start receiver: {exc}")
                 return {"CANCELLED"}
 
-        payload = {
-            "prompt": st.prompt,
-            "duration": st.prompt_duration,
-            "seed": st.prompt_seed,
-            "diffusion_steps": st.prompt_diffusion_steps,
-            "blender_url": f"http://127.0.0.1:{st.port}",
-        }
         try:
+            payload = prompt_payload(context)
             st.last_status = "Sending prompt to Kimodo..."
             data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
@@ -84,15 +114,17 @@ class BridgeGeneratePrompt(bpy.types.Operator):
                 result = json.loads(resp.read().decode("utf-8") or "{}")
             if not result.get("ok"):
                 raise RuntimeError(result.get("error") or "Kimodo generation failed")
-            st.last_status = f"Generated and sent: {result.get('path', '')}"
-            self.report({"INFO"}, "Kimodo motion generated and queued")
+            st.last_status = f"Generated and sent BVH: {result.get('path', '')}"
+            self.report({"INFO"}, "Kimodo motion generated and sent as BVH")
         except Exception as exc:
+            st.auto_retarget_on_receive = previous_auto_retarget
             message = str(exc)
             if "WinError 10061" in message or "actively refused" in message:
                 message = "Kimodo is not listening on 7870 yet. Start Kimodo and wait until WebUI opens."
             st.last_status = f"Error: {message}"
             self.report({"ERROR"}, message)
             return {"CANCELLED"}
+        st.auto_retarget_on_receive = previous_auto_retarget
         return {"FINISHED"}
 
 
@@ -104,9 +136,9 @@ class BridgeOneClickGenerateBind(bpy.types.Operator):
 
     def execute(self, context):
         st = context.scene.rro_bridge
-        target = bridge._armature_from_object(st.target_object)
+        target = bridge._armature_from_object(st.target_object) or context.scene.rsl_retargeting_armature_target
         if target is None:
-            message = "Please select a Mixamo Target in the Kimodo Bridge panel first, then try again."
+            message = "Please select a Mixamo Target first, then try again."
             st.last_status = message
             self.report({"ERROR"}, message)
             return {"CANCELLED"}
@@ -120,14 +152,8 @@ class BridgeOneClickGenerateBind(bpy.types.Operator):
                 self.report({"ERROR"}, f"Could not start receiver: {exc}")
                 return {"CANCELLED"}
 
-        payload = {
-            "prompt": st.prompt,
-            "duration": st.prompt_duration,
-            "seed": st.prompt_seed,
-            "diffusion_steps": st.prompt_diffusion_steps,
-            "blender_url": f"http://127.0.0.1:{st.port}",
-        }
         try:
+            payload = prompt_payload(context)
             st.last_status = "Generating in Kimodo, then binding..."
             data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
@@ -165,10 +191,9 @@ class BridgeOneClickBindLast(bpy.types.Operator):
             source = bpy.data.objects.get(st.last_source_name)
         try:
             result = bridge.run_bind_workflow(context, source, auto_fix_axis=True)
-            source_name = source.name if source and source.name in bpy.data.objects else "source"
             self.report(
                 {"INFO"},
-                f"Bound {source_name} to {result['target'].name}",
+                f"Bound {result['source'].name} to {result['target'].name}",
             )
         except Exception as exc:
             st.last_status = f"Error: {exc}"

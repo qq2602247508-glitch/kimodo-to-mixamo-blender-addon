@@ -1,154 +1,126 @@
 # Kimodo to Mixamo Blender Addon
 
-Blender addon for sending NVIDIA Kimodo BVH motions to a Mixamo-rigged character and retargeting them with a trimmed Rokoko retarget workflow.
+Stable local Blender bridge for generating NVIDIA Kimodo motions and retargeting them to Mixamo-rigged characters.
 
-This addon is meant for a local Kimodo setup:
+This repository intentionally does **not** include NVIDIA Kimodo, model weights, Hugging Face caches, Python virtual environments, Blender project files, or generated BVH/FBX outputs. It only contains the Blender addon and the lightweight local patch/scripts needed to connect an existing Kimodo checkout to Blender.
 
-- Kimodo WebUI on `http://127.0.0.1:7860`
-- Kimodo prompt command API on `http://127.0.0.1:7870`
-- Blender BVH receiver on `http://127.0.0.1:8765`
+## Stable Version
 
-The addon keeps the working Rokoko retarget algorithm, removes the login/cloud workflow from daily use, and adds Kimodo-specific bridge tools.
+Use:
 
-## Features
+```text
+dist/rokoko_retarget_bridge_v1_4_3_13_prompt_segments_draw_fix.zip
+```
 
-- Receive BVH files from local Kimodo/WebUI.
-- Send a prompt from Blender to local Kimodo.
-- One-click generate and bind:
-  - generate a Kimodo motion from a prompt
-  - export as standard T-pose BVH
-  - send to Blender
-  - rebuild bone list
-  - check Mixamo target axis
-  - auto-fix known 90 degree target axis mismatch
-  - fix common Mixamo bone map mistakes
-  - retarget animation
-- One-click bind current BVH sent manually from Kimodo/Viser.
-- Fix common Rokoko auto-detection mistakes where arm bones are mapped to shoulder bones.
-- Detect and fix Mixamo target rigs that face `+X` instead of standard Mixamo `-Y`.
+This is the current known-good baseline:
 
-## Install
+- Blender addon version: `1.4.3.13`
+- Kimodo WebUI: `http://127.0.0.1:7860`
+- Kimodo command API: `http://127.0.0.1:7870`
+- Blender BVH receiver: `http://127.0.0.1:8765`
 
-1. Download the zip from `dist/rokoko_retarget_bridge_v1_4_10_0_scoped_action_libraries.zip`.
-2. In Blender, open `Edit > Preferences > Add-ons`.
+## What Is Included
+
+```text
+rokoko_retarget_bridge/       Blender addon source
+dist/                         Stable installable addon zip
+kimodo_patch/                 Lightweight files to copy into a local Kimodo setup
+```
+
+`kimodo_patch/kimodo/demo/bridge_api.py` adds a local HTTP command API to a patched Kimodo WebUI. The API accepts prompt requests from Blender, generates a Kimodo motion, exports standard T-pose BVH, and sends that BVH back to Blender.
+
+The scripts under `kimodo_patch/scripts/` are local Windows helper scripts for starting Kimodo with CPU text encoder settings and opening the WebUI.
+
+## What Is Not Included
+
+You must install or provide these yourself:
+
+- NVIDIA Kimodo source checkout
+- Kimodo model weights
+- Meta Llama / LLM2Vec text encoder files
+- Hugging Face token/access
+- Python virtual environment
+- Blender
+- Your Mixamo character FBX files
+
+Do not commit these folders to this repo:
+
+```text
+kimodo-src/
+models/
+Meta-Llama-3-8B-Instruct/
+outputs/
+logs/
+.venv*/
+```
+
+## Blender Install
+
+1. Open Blender.
+2. Go to `Edit > Preferences > Add-ons`.
 3. Click `Install...`.
-4. Select the zip file.
+4. Select:
+
+```text
+dist/rokoko_retarget_bridge_v1_4_3_13_prompt_segments_draw_fix.zip
+```
+
 5. Enable `Rokoko Retarget Bridge`.
-6. Open the addon's preferences and set `Action Library` to your external action library folder.
-7. Open the 3D View sidebar, then the `Rokoko` tab.
+6. Open `3D View > Sidebar > Rokoko > Kimodo Bridge`.
 
-## Required Local Kimodo Patch
+## Local Kimodo Patch
 
-The Blender addon expects your local Kimodo WebUI to expose a prompt command API at:
-
-```text
-http://127.0.0.1:7870/kimodo-bridge/generate
-```
-
-In this local setup, Kimodo also exports BVH with `standard_tpose=True`, because Rokoko retargeting is stable with standard T-pose BVH.
-
-If the addon says Kimodo is not listening on `7870`, start your patched local Kimodo first and wait until the WebUI opens.
-
-## Blender Panel
-
-Open:
+Copy the patch files into your local Kimodo workspace:
 
 ```text
-3D View > Sidebar > Rokoko > Kimodo Bridge
+kimodo_patch/kimodo/demo/bridge_api.py -> kimodo-src/kimodo/demo/bridge_api.py
+kimodo_patch/scripts/*.ps1             -> scripts/
 ```
 
-Main fields:
+Your Kimodo app must call `start_bridge_api(demo)` during WebUI startup. In this local workspace that hook is already present. If you are applying this repo to a fresh Kimodo checkout, add the hook near the place where the demo server is initialized.
 
-- `Port`: Blender receiver port. Default: `8765`.
-- `Mixamo Target`: your target Mixamo armature or mesh.
-- `Delete Source After Retarget`: remove generated/imported BVH source armatures after successful retarget. Enabled by default.
-- `Kimodo URL`: local Kimodo command API. Default: `http://127.0.0.1:7870`.
-- `Prompt`: motion prompt to generate.
-- `Duration`: generated motion duration.
-- `Seed`: generation seed.
-- `Steps`: Kimodo denoising steps.
+Start Kimodo with:
 
-## Workflows
+```powershell
+.\scripts\start_kimodo_demo_local_llama_logged.ps1
+```
 
-### One Click Generate + Bind
-
-Use this when you want Blender to generate and retarget in one step.
-
-1. Start Kimodo and wait until `http://127.0.0.1:7860` opens.
-2. In Blender, select your Mixamo target in `Mixamo Target`.
-3. Enter a prompt, for example:
+Then open:
 
 ```text
-A person jumps forward and lands in a game animation style.
+http://127.0.0.1:7860/
 ```
 
-4. Click `One Click Generate + Bind`.
+Keep the WebUI open once before sending prompts from Blender. The command API uses the active WebUI client session.
 
-The addon will generate the BVH in Kimodo, receive it in Blender, auto-fix target axis if needed, rebuild the bone list, fix Mixamo mapping, and retarget.
+## Workflow
 
-### One Click Bind Current BVH
+1. Start Kimodo and wait until the WebUI opens.
+2. Open Blender and import your Mixamo character.
+3. In `Kimodo Bridge`, set `Mixamo Target` to your character armature or mesh.
+4. Use either a single prompt or click `+` to add timeline prompt segments.
+5. Click `Generate and Send BVH` to only receive BVH.
+6. Click `One Click Generate + Bind` to generate, receive, rebuild bone list, fix known Mixamo mapping issues, and retarget.
+7. Click `One Click Bind Current BVH` for a BVH that was manually sent/imported.
 
-Use this when you manually send a BVH from Kimodo/Viser to Blender.
+## Prompt Segments
 
-1. Send BVH from Kimodo/WebUI to Blender.
-2. Select your Mixamo target in `Mixamo Target`.
-3. Click `One Click Bind Current BVH`.
-
-The addon will bind the current/last BVH source to the selected Mixamo target.
-
-### Current Model Action Library
-
-This page is for the selected Mixamo model only. A newly imported model starts with an empty current-model library.
-
-1. Select the model in `Mixamo Target`.
-2. Click `Refresh`.
-3. Use `Send Current Action to Resource Library` after a generated/retargeted action looks good.
-4. Use `Show Selected Action` to preview the selected current-model action.
-5. Use `Retarget Selected` to run the one-click retarget workflow:
+The stable baseline supports simple multi-segment prompt input from Blender:
 
 ```text
-Build Bone List -> Check/Fix Target Axis -> Retarget
+0 - 6: A person walks forward.
+6 - 9: A person jumps.
 ```
 
-The retarget target is the armature or mesh selected in `Mixamo Target`.
+The backend converts each segment duration into frames and calls Kimodo multi-prompt generation. This version does not modify the Viser/WebUI timeline directly; that keeps the WebUI stable.
 
-### Resource Action Library
+## Important Stability Notes
 
-This page is the shared action resource library.
-
-1. Select a resource action.
-2. Click `Send to Current Model` to copy it into the selected model's current-model library.
-3. Click `Delete` to remove the selected resource action from disk.
-
-Resource actions and current-model actions are stored with separate scopes. A new model has a clean empty current-model library until you explicitly click `Send to Current Model` from the resource library.
-
-### Manual Tools
-
-The `Retargeting` panel also includes:
-
-- `Check Target Axis`: checks if the target rest pose is standard Mixamo.
-- `Fix Target Axis`: fixes known target rigs that face `+X` instead of `-Y`.
-- `Fix Mixamo Bone Map`: fixes arm/leg mapping mistakes after `Rebuild Bone List`.
-
-## Mixamo Target Requirements
-
-Best results come from a clean Mixamo rig:
-
-- body faces `-Y`
-- shoulders extend along `X`
-- rest pose is T-pose or compatible with Mixamo
-- bone names are standard Mixamo-style, such as `mixamorig:LeftArm`
-
-If your model was exported from another tool and faces `+X`, use `Check Target Axis` and `Fix Target Axis`.
-
-## Notes
-
-- This addon does not include Kimodo model weights.
-- This addon does not include NVIDIA Kimodo itself.
-- Local Kimodo generation may take time while the text encoder loads.
-- The retarget core is based on Rokoko's Blender retarget workflow, trimmed for local Kimodo/Mixamo use.
-- External action library saving currently stores `.blend` Action data plus `meta.json`. FBX/Godot animation-pack export is planned as a later workflow step.
+- Run only one Kimodo WebUI instance at a time. If multiple instances are open, Viser may move to ports like `7861`, `7862`, or `7863`, and the command API session can become confusing.
+- If Blender says `Open Kimodo WebUI once before sending prompts from Blender`, open `http://127.0.0.1:7860/` and wait for the page to finish loading.
+- If Kimodo cannot send BVH to Blender, make sure the Blender addon receiver is listening on port `8765`.
+- The later action-library experiments are intentionally excluded from this stable release.
 
 ## License
 
-This repository contains code derived from the Rokoko Blender addon and local bridge additions. See `rokoko_retarget_bridge/LICENSE.md` for the included license file.
+This repository contains code derived from the Rokoko Blender addon plus local Kimodo bridge additions. See `rokoko_retarget_bridge/LICENSE.md` for the included license file.

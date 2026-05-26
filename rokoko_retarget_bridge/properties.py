@@ -17,16 +17,7 @@ class RROBridgeSettings(bpy.types.PropertyGroup):
         type=bpy.types.Object,
         poll=bridge.poll_target_object,
     )
-    auto_retarget_on_receive: bpy.props.BoolProperty(
-        name="Auto Retarget Imported BVH",
-        description="When a BVH arrives from Kimodo Bridge, immediately build the bone list and retarget it to the selected Mixamo target",
-        default=True,
-    )
-    delete_source_after_retarget: bpy.props.BoolProperty(
-        name="Delete Source After Retarget",
-        description="Remove imported BVH/library source armatures after a successful retarget",
-        default=True,
-    )
+    auto_retarget_on_receive: bpy.props.BoolProperty(name="Auto Retarget on Receive", default=True)
     kimodo_url: bpy.props.StringProperty(name="Kimodo URL", default="http://127.0.0.1:7870")
     kimodo_start_script: bpy.props.StringProperty(
         name="Start Script",
@@ -40,26 +31,12 @@ class RROBridgeSettings(bpy.types.PropertyGroup):
     last_status: bpy.props.StringProperty(name="Status", default="")
     last_bvh_path: bpy.props.StringProperty(name="Last BVH Path", default="")
     last_source_name: bpy.props.StringProperty(name="Last Source", default="")
-    action_library_path: bpy.props.StringProperty(
-        name="Action Library",
-        default=r"E:\400-game assets\ai\kimodo\action_library",
-        subtype="DIR_PATH",
-    )
-    action_name: bpy.props.StringProperty(name="Action Name", default="idle")
-    character_prefix: bpy.props.StringProperty(
-        name="Character ID",
-        description="Leave empty to use the selected Mixamo Target name",
-        default="",
-    )
-    action_category: bpy.props.StringProperty(name="Category", default="general")
 
 
-class RROActionLibraryItem(bpy.types.PropertyGroup):
-    name: bpy.props.StringProperty(name="Name", default="")
-    character_prefix: bpy.props.StringProperty(name="Character", default="")
-    category: bpy.props.StringProperty(name="Category", default="")
-    path: bpy.props.StringProperty(name="Path", default="")
-    meta_path: bpy.props.StringProperty(name="Meta Path", default="")
+class RROPromptSegment(bpy.types.PropertyGroup):
+    start: bpy.props.FloatProperty(name="Start", default=0.0, min=0.0, max=60.0)
+    end: bpy.props.FloatProperty(name="End", default=6.0, min=0.1, max=60.0)
+    prompt: bpy.props.StringProperty(name="Prompt", default="A person jumps.")
 
 
 def register():
@@ -99,10 +76,8 @@ def register():
     Scene.rsl_retargeting_bone_list = CollectionProperty(type=retargeting_ui.BoneListItem)
     Scene.rsl_retargeting_bone_list_index = EnumSafeIntProperty()
     Scene.rro_bridge = PointerProperty(type=RROBridgeSettings)
-    Scene.rro_action_library_items = CollectionProperty(type=RROActionLibraryItem)
-    Scene.rro_action_library_index = EnumSafeIntProperty()
-    Scene.rro_character_action_items = CollectionProperty(type=RROActionLibraryItem)
-    Scene.rro_character_action_index = EnumSafeIntProperty()
+    Scene.rro_prompt_segments = CollectionProperty(type=RROPromptSegment)
+    Scene.rro_prompt_segment_index = EnumSafeIntProperty()
 
     for bone in animation_lists.get_bones().keys():
         setattr(Object, "rsl_actor_" + bone, StringProperty(name=bone))

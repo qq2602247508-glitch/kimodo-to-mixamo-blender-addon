@@ -4,7 +4,7 @@ bl_info = {
     "category": "Animation",
     "location": "View 3D > Sidebar > Rokoko",
     "description": "Original Rokoko retargeting UI with Kimodo BVH Bridge, without login or cloud features.",
-    "version": (1, 4, 10, 0),
+    "version": (1, 4, 3, 13),
     "blender": (2, 80, 0),
 }
 
@@ -14,15 +14,6 @@ import sys
 from . import bridge
 from . import core
 from . import properties
-from .operators.action_library import (
-    ActionLibraryDeleteSelected,
-    ActionLibraryLoadCharacterSelected,
-    ActionLibraryRefresh,
-    ActionLibraryRetargetCharacterSelected,
-    ActionLibrarySaveCurrent,
-    ActionLibrarySendSelectedToCharacter,
-    RRO_UL_ActionLibrary,
-)
 from .operators.bridge import (
     BridgeGeneratePrompt,
     BridgeOneClickBindLast,
@@ -32,6 +23,7 @@ from .operators.bridge import (
     BridgeStop,
     BridgeUseRokokoTarget,
 )
+from .operators.prompt_segments import AddPromptSegment, RemovePromptSegment, RRO_UL_PromptSegments
 from .operators.detector import ClearCustomBones, ExportCustomBones, ImportCustomBones, SaveCustomBonesRetargeting
 from .operators.retargeting import (
     AddBoneListItem,
@@ -43,38 +35,19 @@ from .operators.retargeting import (
     RetargetAnimation,
 )
 from .panels.bridge import BridgePanel
-from .panels.action_library import ActionLibraryPanel, CurrentCharacterActionsPanel
 from .panels.retargeting import BoneListItem, RetargetingPanel, RSL_UL_BoneList
 
 
 absolute_min_ver = (2, 80, 75)
 
 
-class RokokoRetargetBridgePreferences(bpy.types.AddonPreferences):
-    bl_idname = __name__
-
-    action_library_path: bpy.props.StringProperty(
-        name="Action Library",
-        description="External folder used by Current Character Actions and Action Library",
-        default=r"E:\400-game assets\ai\kimodo\action_library",
-        subtype="DIR_PATH",
-    )
-
-    def draw(self, _context):
-        layout = self.layout
-        layout.prop(self, "action_library_path")
-
-
 classes = [
-    RokokoRetargetBridgePreferences,
     RetargetingPanel,
     BridgePanel,
-    CurrentCharacterActionsPanel,
-    ActionLibraryPanel,
     RSL_UL_BoneList,
-    RRO_UL_ActionLibrary,
+    RRO_UL_PromptSegments,
     BoneListItem,
-    properties.RROActionLibraryItem,
+    properties.RROPromptSegment,
     properties.RROBridgeSettings,
     BuildBoneList,
     AddBoneListItem,
@@ -94,12 +67,8 @@ classes = [
     BridgeOneClickGenerateBind,
     BridgeOneClickBindLast,
     BridgeStartKimodo,
-    ActionLibraryRefresh,
-    ActionLibrarySaveCurrent,
-    ActionLibrarySendSelectedToCharacter,
-    ActionLibraryDeleteSelected,
-    ActionLibraryLoadCharacterSelected,
-    ActionLibraryRetargetCharacterSelected,
+    AddPromptSegment,
+    RemovePromptSegment,
 ]
 
 
@@ -150,10 +119,8 @@ def unregister():
         "rsl_retargeting_use_pose",
         "rsl_retargeting_bone_list",
         "rsl_retargeting_bone_list_index",
-        "rro_action_library_items",
-        "rro_action_library_index",
-        "rro_character_action_items",
-        "rro_character_action_index",
+        "rro_prompt_segments",
+        "rro_prompt_segment_index",
         "rro_bridge",
     ):
         if hasattr(bpy.types.Scene, attr):
