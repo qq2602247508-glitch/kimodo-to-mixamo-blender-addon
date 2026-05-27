@@ -11,6 +11,7 @@ from . import mixamo_tools
 
 _SERVER = None
 _THREAD = None
+_PORT = None
 _QUEUE = queue.Queue()
 _TIMER_RUNNING = False
 _LAST_ERROR = ""
@@ -40,6 +41,38 @@ def poll_target_object(_self, obj):
 
 def is_running():
     return _SERVER is not None
+
+
+def queue_size():
+    return _QUEUE.qsize()
+
+
+def clear_pending_queue():
+    count = 0
+    try:
+        while True:
+            _QUEUE.get_nowait()
+            count += 1
+    except queue.Empty:
+        pass
+    try:
+        settings().last_status = f"Cleared {count} pending BVH item(s)"
+    except Exception:
+        pass
+    return count
+
+
+def current_port():
+    return _PORT
+
+
+def ensure_running(port):
+    if _SERVER is not None and _PORT != int(port):
+        stop_server()
+    if _SERVER is None:
+        start_server(port)
+    else:
+        _ensure_timer()
 
 
 def _set_active(obj):
@@ -91,21 +124,27 @@ def run_bind_workflow(context, source=None, *, auto_fix_axis=True):
     }
 
 
-def _import_bvh(path):
+def _import_bvh(path, request_id="", clip_role="loop"):
     if not os.path.exists(path):
         raise FileNotFoundError(path)
 
     scene = bpy.context.scene
     st = settings()
+    clip_role = str(clip_role or "loop")
+    is_loop_clip = clip_role == "loop"
     before = set(scene.objects)
     bpy.ops.import_anim.bvh(
         filepath=path,
         target="ARMATURE",
         global_scale=st.bvh_scale,
+        frame_start=1,
         rotate_mode="NATIVE",
-        use_fps_scale=True,
+        use_fps_scale=False,
         update_scene_fps=False,
         update_scene_duration=True,
+        use_cyclic=False,
+        axis_forward="-Z",
+        axis_up="Y",
     )
     created = list(set(scene.objects) - before)
     stem = os.path.splitext(os.path.basename(path))[0]
@@ -122,38 +161,74 @@ def _import_bvh(path):
             if parent_collection != collection:
                 parent_collection.objects.unlink(obj)
         if obj.type == "ARMATURE":
-            obj.name = f"Kimodo_{stem}"
+            role_prefix = f"{clip_role}_" if clip_role and clip_role != "loop" else ""
+            obj.name = f"Kimodo_{role_prefix}{stem}"
             obj.data.name = f"{obj.name}_Armature"
             obj["kimodo_bridge_source_bvh"] = path
+            obj["kimodo_clip_role"] = clip_role
             imported = obj
 
     if imported is None:
         raise RuntimeError("BVH imported, but no armature object was created")
 
-    scene.rsl_retargeting_armature_source = imported
+    if is_loop_clip:
+        scene.rsl_retargeting_armature_source = imported
     st.last_bvh_path = path
     st.last_source_name = imported.name
-    st.last_status = "Imported BVH"
+    st.last_received_request_id = request_id
+    role_text = f" {clip_role}" if clip_role else ""
+    st.last_status = f"Imported{role_text} BVH ({request_id})" if request_id else f"Imported{role_text} BVH"
 
     target = _armature_from_object(st.target_object) or scene.rsl_retargeting_armature_target
     if target is not None:
         scene.rsl_retargeting_armature_target = target
 
-    if st.auto_retarget_on_receive:
+    if is_loop_clip and st.auto_retarget_on_receive:
         run_bind_workflow(bpy.context, imported, auto_fix_axis=True)
     else:
         _set_active(imported)
 
+    if is_loop_clip:
+        st.last_completed_request_id = request_id
     return imported
 
 
 def _timer_tick():
     global _TIMER_RUNNING, _LAST_ERROR
+    process_pending_queue()
+
+    if _SERVER is None:
+        _TIMER_RUNNING = False
+        return None
+    return 0.5
+
+
+def process_pending_queue(max_items=0):
+    global _LAST_ERROR
+    processed = 0
     try:
-        while True:
+        while max_items <= 0 or processed < max_items:
             item = _QUEUE.get_nowait()
-            _import_bvh(item["path"])
+            request_id = item.get("request_id", "")
+            clip_role = item.get("clip_role", "loop")
+            if clip_role != "loop" and not settings().loop_send_debug_versions:
+                processed += 1
+                try:
+                    settings().last_status = f"Skipped debug BVH {clip_role} ({request_id})"
+                except Exception:
+                    pass
+                continue
+            try:
+                settings().last_status = (
+                    f"Received {clip_role} BVH, importing... ({request_id})"
+                    if request_id
+                    else f"Received {clip_role} BVH, importing..."
+                )
+            except Exception:
+                pass
+            _import_bvh(item["path"], request_id=request_id, clip_role=clip_role)
             _LAST_ERROR = ""
+            processed += 1
     except queue.Empty:
         pass
     except Exception as exc:
@@ -163,11 +238,7 @@ def _timer_tick():
         except Exception:
             pass
         print(f"[Rokoko Retarget Bridge] Import/retarget failed: {exc}")
-
-    if _SERVER is None:
-        _TIMER_RUNNING = False
-        return None
-    return 0.5
+    return processed
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -186,7 +257,19 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if urlparse(self.path).path == "/health":
-            self._send_json(200, {"ok": True})
+            st = settings()
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "port": _PORT,
+                    "queue_size": _QUEUE.qsize(),
+                    "auto_retarget_on_receive": bool(st.auto_retarget_on_receive),
+                    "target": st.target_object.name if st.target_object else "",
+                    "last_status": st.last_status,
+                    "last_error": _LAST_ERROR,
+                },
+            )
         else:
             self._send_json(404, {"ok": False, "error": "not found"})
 
@@ -199,28 +282,51 @@ class _Handler(BaseHTTPRequestHandler):
             body = self.rfile.read(length).decode("utf-8")
             payload = json.loads(body or "{}")
             path = os.path.abspath(payload["path"])
+            request_id = str(payload.get("request_id") or "")
+            clip_role = str(payload.get("clip_role") or "loop")
             if not path.lower().endswith(".bvh"):
                 raise ValueError("path must point to a .bvh file")
-            _QUEUE.put({"path": path})
-            self._send_json(200, {"ok": True, "queued": path})
+            _QUEUE.put({"path": path, "request_id": request_id, "clip_role": clip_role, "metadata": payload})
+            _ensure_timer()
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "queued": path,
+                    "request_id": request_id,
+                    "clip_role": clip_role,
+                    "queue_size": _QUEUE.qsize(),
+                },
+            )
         except Exception as exc:
             self._send_json(400, {"ok": False, "error": str(exc)})
 
 
 def _ensure_timer():
     global _TIMER_RUNNING
-    if not _TIMER_RUNNING:
+    try:
+        is_registered = bpy.app.timers.is_registered(_timer_tick)
+    except Exception:
+        is_registered = _TIMER_RUNNING
+    if not is_registered:
         bpy.app.timers.register(_timer_tick, first_interval=0.2)
-        _TIMER_RUNNING = True
+    _TIMER_RUNNING = True
 
 
 def start_server(port):
-    global _SERVER, _THREAD, _LAST_ERROR
+    global _SERVER, _THREAD, _PORT, _LAST_ERROR
+    port = int(port)
+    if _SERVER is not None:
+        if _PORT == port:
+            _ensure_timer()
+            return
+        stop_server()
     if _SERVER is not None:
         return
-    _SERVER = ThreadingHTTPServer(("127.0.0.1", int(port)), _Handler)
+    _SERVER = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
     _THREAD = threading.Thread(target=_SERVER.serve_forever, daemon=True)
     _THREAD.start()
+    _PORT = port
     _ensure_timer()
     _LAST_ERROR = ""
     settings().last_status = f"Listening on http://127.0.0.1:{port}"
@@ -228,12 +334,13 @@ def start_server(port):
 
 
 def stop_server():
-    global _SERVER, _THREAD, _LAST_ERROR
+    global _SERVER, _THREAD, _PORT, _LAST_ERROR
     if _SERVER is not None:
         _SERVER.shutdown()
         _SERVER.server_close()
     _SERVER = None
     _THREAD = None
+    _PORT = None
     _LAST_ERROR = ""
     if bpy.context.scene and hasattr(bpy.context.scene, "rro_bridge"):
         settings().last_status = "Stopped"

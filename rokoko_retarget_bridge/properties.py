@@ -24,18 +24,52 @@ class RROBridgeSettings(bpy.types.PropertyGroup):
         default=r"E:\400-game assets\ai\kimodo\scripts\start_kimodo_demo_local_llama_logged.ps1",
         subtype="FILE_PATH",
     )
+    kimodo_stop_script: bpy.props.StringProperty(
+        name="Stop Script",
+        default=r"E:\400-game assets\ai\kimodo\scripts\stop_kimodo_ports.ps1",
+        subtype="FILE_PATH",
+    )
+    kimodo_open_browser_on_start: bpy.props.BoolProperty(name="Open WebUI After Start", default=True)
     prompt: bpy.props.StringProperty(name="Prompt", default="A person jumps.")
-    prompt_duration: bpy.props.FloatProperty(name="Duration", default=6.0, min=1.0, max=10.0)
+    prompt_duration: bpy.props.FloatProperty(name="Duration", default=4.0, min=1.0, max=10.0)
     prompt_seed: bpy.props.IntProperty(name="Seed", default=42)
-    prompt_diffusion_steps: bpy.props.IntProperty(name="Steps", default=100, min=2, max=1000)
+    prompt_diffusion_steps: bpy.props.IntProperty(name="Steps", default=70, min=2, max=1000)
+    loop_style_strength: bpy.props.FloatProperty(
+        name="Style Strength",
+        description="Higher values keep more of the prompt style while Kimodo builds the motion",
+        default=5.0,
+        min=0.0,
+        max=10.0,
+    )
+    loop_path_points: bpy.props.IntProperty(
+        name="Path Points",
+        description="How many straight-path guide points Kimodo should use for loop generation",
+        default=5,
+        min=2,
+        max=30,
+    )
+    loop_auto_pose: bpy.props.BoolProperty(
+        name="Auto Pose Frame",
+        description="Let Kimodo choose a stable loop pose frame instead of using frame 30",
+        default=False,
+    )
+    loop_send_debug_versions: bpy.props.BoolProperty(
+        name="Send Debug Versions",
+        description="Also import original, stage1 straight, and stage2 moving BVHs for comparison",
+        default=False,
+    )
     last_status: bpy.props.StringProperty(name="Status", default="")
+    last_debug_json: bpy.props.StringProperty(name="Debug", default="")
     last_bvh_path: bpy.props.StringProperty(name="Last BVH Path", default="")
     last_source_name: bpy.props.StringProperty(name="Last Source", default="")
+    last_request_id: bpy.props.StringProperty(name="Last Request ID", default="")
+    last_received_request_id: bpy.props.StringProperty(name="Last Received Request ID", default="")
+    last_completed_request_id: bpy.props.StringProperty(name="Last Completed Request ID", default="")
 
 
 class RROPromptSegment(bpy.types.PropertyGroup):
     start: bpy.props.FloatProperty(name="Start", default=0.0, min=0.0, max=60.0)
-    end: bpy.props.FloatProperty(name="End", default=6.0, min=0.1, max=60.0)
+    end: bpy.props.FloatProperty(name="End", default=4.0, min=0.1, max=60.0)
     prompt: bpy.props.StringProperty(name="Prompt", default="A person jumps.")
 
 

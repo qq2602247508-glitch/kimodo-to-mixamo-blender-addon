@@ -10,6 +10,7 @@ scripts/open_kimodo_webui.ps1
 scripts/start_kimodo_demo_local_llama.ps1
 scripts/start_kimodo_demo_local_llama_logged.ps1
 scripts/run_kimodo_demo_logged_child.ps1
+scripts/stop_kimodo_ports.ps1
 ```
 
 ## Apply
@@ -57,9 +58,12 @@ http://127.0.0.1:7870/health
 with:
 
 ```json
-{"ok": true}
+{"ok": true, "bridge_version": "straight-style-generation-v9"}
 ```
 
-## Important
+## Current Behavior
 
-Open the Kimodo WebUI once before sending prompts from Blender. The bridge API uses the active WebUI client session to generate motions.
+- `Generate and Send BVH` uses prompt style strength and straight-line root path constraints.
+- `One Click Generate + Bind` uses the same normal-generation path, then retargets in Blender.
+- `Loop Generate + Bind` uses the two-stage loop workflow and can optionally send original/stage comparison BVHs.
+- Open the Kimodo WebUI once before sending prompts from Blender. The bridge API uses the active WebUI client session to generate motions.

@@ -4,7 +4,7 @@ bl_info = {
     "category": "Animation",
     "location": "View 3D > Sidebar > Rokoko",
     "description": "Original Rokoko retargeting UI with Kimodo BVH Bridge, without login or cloud features.",
-    "version": (1, 4, 3, 13),
+    "version": (1, 4, 3, 27),
     "blender": (2, 80, 0),
 }
 
@@ -16,11 +16,16 @@ from . import core
 from . import properties
 from .operators.bridge import (
     BridgeGeneratePrompt,
+    BridgeClearQueue,
+    BridgeCopyDebugLog,
+    BridgeProcessQueue,
     BridgeOneClickBindLast,
     BridgeOneClickGenerateBind,
+    BridgeOneClickGenerateLoopBind,
     BridgeStart,
     BridgeStartKimodo,
     BridgeStop,
+    BridgeStopKimodo,
     BridgeUseRokokoTarget,
 )
 from .operators.prompt_segments import AddPromptSegment, RemovePromptSegment, RRO_UL_PromptSegments
@@ -34,7 +39,7 @@ from .operators.retargeting import (
     FixMixamoTargetAxis,
     RetargetAnimation,
 )
-from .panels.bridge import BridgePanel
+from .panels.bridge import BridgeAdvancedPanel, BridgePanel
 from .panels.retargeting import BoneListItem, RetargetingPanel, RSL_UL_BoneList
 
 
@@ -44,6 +49,7 @@ absolute_min_ver = (2, 80, 75)
 classes = [
     RetargetingPanel,
     BridgePanel,
+    BridgeAdvancedPanel,
     RSL_UL_BoneList,
     RRO_UL_PromptSegments,
     BoneListItem,
@@ -64,9 +70,14 @@ classes = [
     BridgeStop,
     BridgeUseRokokoTarget,
     BridgeGeneratePrompt,
+    BridgeClearQueue,
+    BridgeCopyDebugLog,
+    BridgeProcessQueue,
     BridgeOneClickGenerateBind,
+    BridgeOneClickGenerateLoopBind,
     BridgeOneClickBindLast,
     BridgeStartKimodo,
+    BridgeStopKimodo,
     AddPromptSegment,
     RemovePromptSegment,
 ]

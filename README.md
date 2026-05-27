@@ -9,12 +9,13 @@ This repository intentionally does **not** include NVIDIA Kimodo, model weights,
 Use:
 
 ```text
-dist/rokoko_retarget_bridge_v1_4_3_13_prompt_segments_draw_fix.zip
+dist/rokoko_retarget_bridge_v1_4_3_27_straight_style_all.zip
 ```
 
-This is the current known-good baseline:
+Known-good local setup:
 
-- Blender addon version: `1.4.3.13`
+- Blender addon version: `1.4.3.27`
+- Kimodo bridge API version: `straight-style-generation-v9`
 - Kimodo WebUI: `http://127.0.0.1:7860`
 - Kimodo command API: `http://127.0.0.1:7870`
 - Blender BVH receiver: `http://127.0.0.1:8765`
@@ -27,9 +28,17 @@ dist/                         Stable installable addon zip
 kimodo_patch/                 Lightweight files to copy into a local Kimodo setup
 ```
 
-`kimodo_patch/kimodo/demo/bridge_api.py` adds a local HTTP command API to a patched Kimodo WebUI. The API accepts prompt requests from Blender, generates a Kimodo motion, exports standard T-pose BVH, and sends that BVH back to Blender.
+`kimodo_patch/kimodo/demo/bridge_api.py` adds a local HTTP command API to a patched Kimodo WebUI. The API accepts prompt requests from Blender, generates Kimodo motion, exports standard T-pose BVH, and sends that BVH back to Blender.
 
-The scripts under `kimodo_patch/scripts/` are local Windows helper scripts for starting Kimodo with CPU text encoder settings and opening the WebUI.
+The bridge supports:
+
+- Generate and send BVH to Blender.
+- One-click generate and retarget to a selected Mixamo target.
+- Loop-ready generation and retarget.
+- Style Strength control.
+- Path Points straight-line root constraint for normal generation and loop generation.
+- Optional debug comparison BVHs for loop generation.
+- Copyable debug logs from the Blender addon.
 
 ## What Is Not Included
 
@@ -62,7 +71,7 @@ logs/
 4. Select:
 
 ```text
-dist/rokoko_retarget_bridge_v1_4_3_13_prompt_segments_draw_fix.zip
+dist/rokoko_retarget_bridge_v1_4_3_27_straight_style_all.zip
 ```
 
 5. Enable `Rokoko Retarget Bridge`.
@@ -93,33 +102,37 @@ http://127.0.0.1:7860/
 
 Keep the WebUI open once before sending prompts from Blender. The command API uses the active WebUI client session.
 
+Check the command API:
+
+```text
+http://127.0.0.1:7870/health
+```
+
+It should report:
+
+```json
+{"ok": true, "bridge_version": "straight-style-generation-v9"}
+```
+
 ## Workflow
 
 1. Start Kimodo and wait until the WebUI opens.
 2. Open Blender and import your Mixamo character.
 3. In `Kimodo Bridge`, set `Mixamo Target` to your character armature or mesh.
-4. Use either a single prompt or click `+` to add timeline prompt segments.
+4. Enter a prompt, duration, seed, steps, Style Strength, and Path Points.
 5. Click `Generate and Send BVH` to only receive BVH.
 6. Click `One Click Generate + Bind` to generate, receive, rebuild bone list, fix known Mixamo mapping issues, and retarget.
-7. Click `One Click Bind Current BVH` for a BVH that was manually sent/imported.
+7. Click `Loop Generate + Bind` for loop-ready walking/running style clips.
+8. Click `One Click Bind Current BVH` for a BVH that was manually sent/imported.
 
-## Prompt Segments
-
-The stable baseline supports simple multi-segment prompt input from Blender:
-
-```text
-0 - 6: A person walks forward.
-6 - 9: A person jumps.
-```
-
-The backend converts each segment duration into frames and calls Kimodo multi-prompt generation. This version does not modify the Viser/WebUI timeline directly; that keeps the WebUI stable.
+If no Mixamo target is selected, generation still runs and imports the BVH; retargeting is skipped.
 
 ## Important Stability Notes
 
 - Run only one Kimodo WebUI instance at a time. If multiple instances are open, Viser may move to ports like `7861`, `7862`, or `7863`, and the command API session can become confusing.
 - If Blender says `Open Kimodo WebUI once before sending prompts from Blender`, open `http://127.0.0.1:7860/` and wait for the page to finish loading.
 - If Kimodo cannot send BVH to Blender, make sure the Blender addon receiver is listening on port `8765`.
-- The later action-library experiments are intentionally excluded from this stable release.
+- The repository stores only the patch/addon. Keep model files and generated assets outside git.
 
 ## License
 
