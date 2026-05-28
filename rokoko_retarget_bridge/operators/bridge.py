@@ -95,8 +95,10 @@ def _send_generation_request(context, *, loop_workflow=False, bind=False):
     payload["request_id"] = request_id
     payload["loop_workflow"] = bool(loop_workflow)
     payload["style_strength"] = st.loop_style_strength
-    payload["loop_path_points"] = st.loop_path_points
-    payload["loop_height_axis"] = "AUTO"
+    payload["use_path_constraint"] = bool(loop_workflow or st.use_path_constraint)
+    if loop_workflow or st.use_path_constraint:
+        payload["loop_path_points"] = st.loop_path_points
+        payload["loop_height_axis"] = "AUTO"
     if loop_workflow:
         payload["loop_exact"] = True
         payload["loop_inplace"] = True
@@ -111,7 +113,8 @@ def _send_generation_request(context, *, loop_workflow=False, bind=False):
             "request_id": request_id,
             "loop_workflow": bool(loop_workflow),
             "style_strength": st.loop_style_strength,
-            "path_points": st.loop_path_points if loop_workflow else None,
+            "use_path_constraint": bool(loop_workflow or st.use_path_constraint),
+            "path_points": st.loop_path_points if loop_workflow or st.use_path_constraint else None,
             "send_debug_versions": st.loop_send_debug_versions if loop_workflow else None,
             "payload": payload,
         },
@@ -238,8 +241,10 @@ class BridgeGeneratePrompt(bpy.types.Operator):
             request_id = _request_id()
             payload["request_id"] = request_id
             payload["style_strength"] = st.loop_style_strength
-            payload["loop_path_points"] = st.loop_path_points
-            payload["loop_height_axis"] = "AUTO"
+            payload["use_path_constraint"] = bool(st.use_path_constraint)
+            if st.use_path_constraint:
+                payload["loop_path_points"] = st.loop_path_points
+                payload["loop_height_axis"] = "AUTO"
             st.last_request_id = request_id
             st.last_status = "Sending prompt to Kimodo..."
             data = json.dumps(payload).encode("utf-8")
@@ -258,6 +263,7 @@ class BridgeGeneratePrompt(bpy.types.Operator):
                     "bridge_version": result.get("bridge_version"),
                     "generation_mode": result.get("generation_mode"),
                     "style_strength": result.get("style_strength"),
+                    "use_path_constraint": result.get("use_path_constraint"),
                     "cfg_weight": result.get("cfg_weight"),
                     "path_points": result.get("path_points"),
                     "stage1_path_diagnostics": result.get("stage1_path_diagnostics"),

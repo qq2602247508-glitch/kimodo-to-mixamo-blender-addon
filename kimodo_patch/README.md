@@ -58,12 +58,13 @@ http://127.0.0.1:7870/health
 with:
 
 ```json
-{"ok": true, "bridge_version": "straight-style-generation-v9"}
+{"ok": true, "bridge_version": "straight-style-path-toggle-v10"}
 ```
 
 ## Current Behavior
 
 - `Generate and Send BVH` uses prompt style strength and straight-line root path constraints.
 - `One Click Generate + Bind` uses the same normal-generation path, then retargets in Blender.
+- Disable `Use Path Constraint` in Blender for prompt-only in-place actions.
 - `Loop Generate + Bind` uses the two-stage loop workflow and can optionally send original/stage comparison BVHs.
 - Open the Kimodo WebUI once before sending prompts from Blender. The bridge API uses the active WebUI client session to generate motions.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.3.28 - Path Constraint Toggle
+
+- Added `Use Path Constraint` to normal generation and one-click bind.
+- When enabled, normal generation uses the straight path root constraint.
+- When disabled, normal generation is prompt-only for idle, attack, dance, wave, and other in-place actions.
+- Loop generation still forces path constraints because the loop workflow depends on a forward path.
+- Updated Kimodo bridge API version to `straight-style-path-toggle-v10`.
+- Added `dist/kimodo_mixamo_v1_4_3_28_full_package.zip`, including Blender addon zip, Kimodo patch, and helper scripts.
+
 ## 1.4.3.27 - Stable Straight Style Generation
 
 - Saved the current known-good Blender addon and Kimodo patch pair.

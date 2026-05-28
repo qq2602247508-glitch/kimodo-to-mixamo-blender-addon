@@ -65,6 +65,7 @@ class BridgePanel(ToolPanel, bpy.types.Panel):
         generation_box = box.box()
         generation_box.label(text="Generation Settings")
         generation_box.prop(st, "loop_style_strength", text="Style Strength", slider=True)
+        generation_box.prop(st, "use_path_constraint", text="Use Path Constraint")
         generation_box.prop(st, "loop_path_points", text="Path Points")
         generation_box.prop(st, "loop_auto_pose")
         generation_box.prop(st, "loop_send_debug_versions")

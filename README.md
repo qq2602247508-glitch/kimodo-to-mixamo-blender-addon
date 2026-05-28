@@ -9,13 +9,13 @@ This repository intentionally does **not** include NVIDIA Kimodo, model weights,
 Use:
 
 ```text
-dist/rokoko_retarget_bridge_v1_4_3_27_straight_style_all.zip
+dist/rokoko_retarget_bridge_v1_4_3_28_path_toggle.zip
 ```
 
 Known-good local setup:
 
-- Blender addon version: `1.4.3.27`
-- Kimodo bridge API version: `straight-style-generation-v9`
+- Blender addon version: `1.4.3.28`
+- Kimodo bridge API version: `straight-style-path-toggle-v10`
 - Kimodo WebUI: `http://127.0.0.1:7860`
 - Kimodo command API: `http://127.0.0.1:7870`
 - Blender BVH receiver: `http://127.0.0.1:8765`
@@ -37,8 +37,15 @@ The bridge supports:
 - Loop-ready generation and retarget.
 - Style Strength control.
 - Path Points straight-line root constraint for normal generation and loop generation.
+- Use Path Constraint toggle for normal generation and one-click bind.
 - Optional debug comparison BVHs for loop generation.
 - Copyable debug logs from the Blender addon.
+
+For backup or transfer, use the complete package:
+
+```text
+dist/kimodo_mixamo_v1_4_3_28_full_package.zip
+```
 
 ## What Is Not Included
 
@@ -71,7 +78,7 @@ logs/
 4. Select:
 
 ```text
-dist/rokoko_retarget_bridge_v1_4_3_27_straight_style_all.zip
+dist/rokoko_retarget_bridge_v1_4_3_28_path_toggle.zip
 ```
 
 5. Enable `Rokoko Retarget Bridge`.
@@ -111,7 +118,7 @@ http://127.0.0.1:7870/health
 It should report:
 
 ```json
-{"ok": true, "bridge_version": "straight-style-generation-v9"}
+{"ok": true, "bridge_version": "straight-style-path-toggle-v10"}
 ```
 
 ## Workflow
@@ -119,7 +126,7 @@ It should report:
 1. Start Kimodo and wait until the WebUI opens.
 2. Open Blender and import your Mixamo character.
 3. In `Kimodo Bridge`, set `Mixamo Target` to your character armature or mesh.
-4. Enter a prompt, duration, seed, steps, Style Strength, and Path Points.
+4. Enter a prompt, duration, seed, steps, Style Strength, Use Path Constraint, and Path Points.
 5. Click `Generate and Send BVH` to only receive BVH.
 6. Click `One Click Generate + Bind` to generate, receive, rebuild bone list, fix known Mixamo mapping issues, and retarget.
 7. Click `Loop Generate + Bind` for loop-ready walking/running style clips.

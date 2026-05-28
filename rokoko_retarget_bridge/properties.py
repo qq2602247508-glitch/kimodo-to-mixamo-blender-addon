@@ -41,6 +41,11 @@ class RROBridgeSettings(bpy.types.PropertyGroup):
         min=0.0,
         max=10.0,
     )
+    use_path_constraint: bpy.props.BoolProperty(
+        name="Use Path Constraint",
+        description="Constrain normal generation to move along a straight path. Turn this off for in-place actions.",
+        default=True,
+    )
     loop_path_points: bpy.props.IntProperty(
         name="Path Points",
         description="How many straight-path guide points Kimodo should use for loop generation",

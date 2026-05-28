@@ -26,7 +26,7 @@ _SERVER = None
 _THREAD = None
 _QUEUE = queue.Queue()
 _WORKER = None
-_BRIDGE_VERSION = "straight-style-generation-v9"
+_BRIDGE_VERSION = "straight-style-path-toggle-v10"
 
 
 def _primary_session(demo):
@@ -640,20 +640,16 @@ def _export_straight_prompt_bvh(demo, session, out_path, payload, prompts, num_f
     raw_prompt = " ".join(prompts).strip() if len(prompts) > 1 else prompts[0]
     prompt = _prompt_for_style(raw_prompt, payload)
     path_points = _path_points_from_style(payload, total_frames)
+    use_path_constraint = bool(payload.get("use_path_constraint", True))
     use_heading = bool(payload.get("loop_use_heading", False))
     style_strength = float(payload.get("style_strength") if payload.get("style_strength") is not None else 5.0)
     style_strength = max(0.0, min(10.0, style_strength))
     cfg_weight = _cfg_from_style_strength(payload)
 
     seed_everything(seed)
-    output = _call_model_with_session_cache(
-        model,
-        session,
-        prompt,
-        total_frames,
-        diffusion_steps,
-        multi_prompt=False,
-        constraint_lst=[
+    constraint_lst = []
+    if use_path_constraint:
+        constraint_lst = [
             [
                 _straight_root_constraint(
                     model_skeleton,
@@ -664,7 +660,16 @@ def _export_straight_prompt_bvh(demo, session, out_path, payload, prompts, num_f
                     use_heading=use_heading,
                 )
             ]
-        ],
+        ]
+
+    output = _call_model_with_session_cache(
+        model,
+        session,
+        prompt,
+        total_frames,
+        diffusion_steps,
+        multi_prompt=False,
+        constraint_lst=constraint_lst,
         cfg_weight=cfg_weight,
         num_samples=1,
         cfg_type="separated",
@@ -684,12 +689,15 @@ def _export_straight_prompt_bvh(demo, session, out_path, payload, prompts, num_f
     demo.set_frame(session.client.client_id, 0)
     return {
         "loop_workflow": False,
-        "generation_mode": "straight_path_prompt",
-        "forward_distance": forward_distance,
-        "path_points": path_points,
+        "generation_mode": "straight_path_prompt" if use_path_constraint else "prompt_only",
+        "use_path_constraint": use_path_constraint,
+        "forward_distance": forward_distance if use_path_constraint else None,
+        "path_points": path_points if use_path_constraint else None,
         "style_strength": style_strength,
         "cfg_weight": cfg_weight,
-        "stage1_path_diagnostics": _root_path_diagnostics(output, export_skeleton, forward_distance),
+        "stage1_path_diagnostics": _root_path_diagnostics(output, export_skeleton, forward_distance)
+        if use_path_constraint
+        else None,
     }
 
 
