@@ -1,8 +1,11 @@
 import bpy
 import json
+import os
 import subprocess
 import time
 import urllib.request
+import random
+import tempfile
 
 from .. import bridge
 
@@ -38,6 +41,21 @@ def _ensure_kimodo(st):
         raise RuntimeError(message)
 
 
+def _post_generate(st, payload):
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        st.kimodo_url.rstrip("/") + "/kimodo-bridge/generate",
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=900) as resp:
+        result = json.loads(resp.read().decode("utf-8") or "{}")
+    if not result.get("ok"):
+        raise RuntimeError(result.get("error") or "Kimodo generation failed")
+    return result
+
+
 def prompt_payload(context):
     st = context.scene.rro_bridge
     segments = []
@@ -56,7 +74,7 @@ def prompt_payload(context):
             if last_end is not None and segment["start"] < last_end:
                 raise ValueError(f"Prompt segment {index + 1}: start time overlaps the previous segment.")
             last_end = segment["end"]
-        return {
+        payload = {
             "prompt": segments[0]["prompt"],
             "duration": max(segment["end"] for segment in segments),
             "segments": segments,
@@ -64,14 +82,22 @@ def prompt_payload(context):
             "diffusion_steps": st.prompt_diffusion_steps,
             "blender_url": f"http://127.0.0.1:{st.port}",
         }
+        output_dir = bpy.path.abspath(st.cache_output_dir).strip()
+        if output_dir:
+            payload["output_dir"] = output_dir
+        return payload
 
-    return {
+    payload = {
         "prompt": st.prompt,
         "duration": st.prompt_duration,
         "seed": st.prompt_seed,
         "diffusion_steps": st.prompt_diffusion_steps,
         "blender_url": f"http://127.0.0.1:{st.port}",
     }
+    output_dir = bpy.path.abspath(st.cache_output_dir).strip()
+    if output_dir:
+        payload["output_dir"] = output_dir
+    return payload
 
 
 def _send_generation_request(context, *, loop_workflow=False, bind=False):
@@ -93,6 +119,8 @@ def _send_generation_request(context, *, loop_workflow=False, bind=False):
     payload = prompt_payload(context)
     request_id = _request_id()
     payload["request_id"] = request_id
+    if st.randomize_seed_on_generate:
+        payload["seed"] = random.randint(1, 2147483646)
     payload["loop_workflow"] = bool(loop_workflow)
     payload["style_strength"] = st.loop_style_strength
     payload["use_path_constraint"] = bool(loop_workflow or st.use_path_constraint)
@@ -103,6 +131,7 @@ def _send_generation_request(context, *, loop_workflow=False, bind=False):
         payload["loop_exact"] = True
         payload["loop_inplace"] = True
         payload["loop_auto_pose"] = st.loop_auto_pose
+        payload["loop_close_tail"] = st.loop_close_tail
         payload["send_original_comparison"] = st.loop_send_debug_versions
     st.last_request_id = request_id
     st.last_received_request_id = ""
@@ -116,6 +145,9 @@ def _send_generation_request(context, *, loop_workflow=False, bind=False):
             "use_path_constraint": bool(loop_workflow or st.use_path_constraint),
             "path_points": st.loop_path_points if loop_workflow or st.use_path_constraint else None,
             "send_debug_versions": st.loop_send_debug_versions if loop_workflow else None,
+            "warmup_before_bind": bool(loop_workflow and bind and st.loop_warmup_before_bind),
+            "loop_close_tail": bool(st.loop_close_tail) if loop_workflow else None,
+            "randomize_seed": bool(st.randomize_seed_on_generate),
             "payload": payload,
         },
         ensure_ascii=False,
@@ -134,17 +166,17 @@ def _send_generation_request(context, *, loop_workflow=False, bind=False):
     if cleared:
         st.last_status += f" Cleared {cleared} stale queued BVH item(s)."
 
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        st.kimodo_url.rstrip("/") + "/kimodo-bridge/generate",
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=900) as resp:
-        result = json.loads(resp.read().decode("utf-8") or "{}")
-    if not result.get("ok"):
-        raise RuntimeError(result.get("error") or "Kimodo generation failed")
+    if loop_workflow and bind and st.loop_warmup_before_bind:
+        warmup_payload = dict(payload)
+        warmup_payload["request_id"] = request_id + "_warmup"
+        warmup_payload["blender_url"] = ""
+        warmup_payload["send_original_comparison"] = False
+        st.last_status = f"Warming up Kimodo loop workflow... ({request_id})"
+        _post_generate(st, warmup_payload)
+        bridge.clear_pending_queue()
+        st.last_status = f"Warmup done. Generating loop motion in Kimodo, then binding... ({request_id})"
+
+    result = _post_generate(st, payload)
 
     debug_result = {
         "bridge_version": result.get("bridge_version"),
@@ -168,17 +200,25 @@ def _send_generation_request(context, *, loop_workflow=False, bind=False):
         "stage1_path": result.get("stage1_path"),
         "stage2_path": result.get("stage2_path"),
         "blender_results": result.get("blender_results"),
+        "warmup_before_bind": bool(loop_workflow and bind and st.loop_warmup_before_bind),
+        "loop_close_tail": bool(st.loop_close_tail) if loop_workflow else None,
+        "randomize_seed": bool(st.randomize_seed_on_generate),
         "payload": payload,
     }
     st.last_debug_json = json.dumps(debug_result, ensure_ascii=False)
     max_items = max(1, len(result.get("blender_results") or []))
-    processed = bridge.process_pending_queue(max_items=max_items)
+    processed = bridge.process_request_queue(
+        request_id,
+        expected_loop=bool(loop_workflow or bind),
+        max_items=max_items,
+        wait_seconds=8.0,
+    )
     return request_id, result, processed, will_bind
 
 
 class BridgeStart(bpy.types.Operator):
     bl_idname = "rro_bridge.start"
-    bl_label = "Start Bridge"
+    bl_label = "启动接收器"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -192,7 +232,7 @@ class BridgeStart(bpy.types.Operator):
 
 class BridgeStop(bpy.types.Operator):
     bl_idname = "rro_bridge.stop"
-    bl_label = "Stop Bridge"
+    bl_label = "停止接收器"
     bl_options = {"REGISTER"}
 
     def execute(self, _context):
@@ -202,8 +242,8 @@ class BridgeStop(bpy.types.Operator):
 
 class BridgeUseRokokoTarget(bpy.types.Operator):
     bl_idname = "rro_bridge.use_rokoko_target"
-    bl_label = "Use Rokoko Target"
-    bl_description = "Use the current Rokoko Retargeting target as the Bridge Mixamo target"
+    bl_label = "使用当前 Mixamo 目标"
+    bl_description = "使用当前重定向面板里的目标骨架作为绑定目标"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -218,8 +258,8 @@ class BridgeUseRokokoTarget(bpy.types.Operator):
 
 class BridgeGeneratePrompt(bpy.types.Operator):
     bl_idname = "rro_bridge.generate_prompt"
-    bl_label = "Generate and Send BVH"
-    bl_description = "Send the prompt to local Kimodo, then receive the generated standard T-pose BVH without retargeting"
+    bl_label = "生成并发送 BVH"
+    bl_description = "发送提示词到本地 Kimodo，并接收生成的 BVH，不自动绑定"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -296,8 +336,8 @@ class BridgeGeneratePrompt(bpy.types.Operator):
 
 class BridgeOneClickGenerateBind(bpy.types.Operator):
     bl_idname = "rro_bridge.one_click_generate_bind"
-    bl_label = "One Click Generate + Bind"
-    bl_description = "Generate a Kimodo BVH, auto-fix the target if needed, rebuild bones, and retarget"
+    bl_label = "一键生成并绑定"
+    bl_description = "生成 Kimodo BVH，自动检查目标、重建骨骼列表并绑定到 Mixamo 角色"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -329,7 +369,7 @@ class BridgeOneClickGenerateBind(bpy.types.Operator):
 class BridgeOneClickGenerateLoopBind(bpy.types.Operator):
     bl_idname = "rro_bridge.one_click_generate_loop_bind"
     bl_label = "循环生成并绑定"
-    bl_description = "Generate a loop-ready Kimodo BVH with the v8 workflow, then auto-fix target, rebuild bones, and retarget"
+    bl_description = "生成适合循环的 Kimodo BVH，自动检查目标、重建骨骼列表并绑定"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -360,8 +400,8 @@ class BridgeOneClickGenerateLoopBind(bpy.types.Operator):
 
 class BridgeClearQueue(bpy.types.Operator):
     bl_idname = "rro_bridge.clear_queue"
-    bl_label = "Clear Pending BVH Queue"
-    bl_description = "Clear BVH files that were queued but not imported"
+    bl_label = "清空待接收队列"
+    bl_description = "清空已经排队但尚未导入的 BVH"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -371,10 +411,49 @@ class BridgeClearQueue(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class BridgeClearGeneratedCache(bpy.types.Operator):
+    bl_idname = "rro_bridge.clear_generated_cache"
+    bl_label = "删除生成缓存文件"
+    bl_description = "删除生成缓存目录里的 Kimodo BVH 过程文件"
+    bl_options = {"REGISTER"}
+
+    def execute(self, context):
+        st = context.scene.rro_bridge
+        cache_dir = bpy.path.abspath(st.cache_output_dir).strip()
+        if not cache_dir:
+            cache_dir = os.path.join(tempfile.gettempdir(), "kimodo_blender_bridge")
+        if not os.path.isdir(cache_dir):
+            st.last_status = f"Cache directory does not exist: {cache_dir}"
+            self.report({"WARNING"}, st.last_status)
+            return {"CANCELLED"}
+
+        removed = 0
+        errors = []
+        for name in os.listdir(cache_dir):
+            path = os.path.join(cache_dir, name)
+            if not os.path.isfile(path):
+                continue
+            if not name.lower().endswith((".bvh", ".json", ".txt")):
+                continue
+            try:
+                os.remove(path)
+                removed += 1
+            except Exception as exc:
+                errors.append(f"{name}: {exc}")
+
+        st.last_status = f"Deleted {removed} generated cache file(s) from {cache_dir}"
+        if errors:
+            st.last_status += f"; {len(errors)} file(s) failed"
+            self.report({"WARNING"}, st.last_status)
+        else:
+            self.report({"INFO"}, st.last_status)
+        return {"FINISHED"}
+
+
 class BridgeProcessQueue(bpy.types.Operator):
     bl_idname = "rro_bridge.process_queue"
-    bl_label = "Process Pending BVH Queue"
-    bl_description = "Import and optionally retarget BVH files that are waiting in the Blender receiver queue"
+    bl_label = "处理待接收 BVH"
+    bl_description = "导入接收队列中等待处理的 BVH"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -388,8 +467,8 @@ class BridgeProcessQueue(bpy.types.Operator):
 
 class BridgeOneClickBindLast(bpy.types.Operator):
     bl_idname = "rro_bridge.one_click_bind_last"
-    bl_label = "One Click Bind Current BVH"
-    bl_description = "Auto-fix target axis if needed, rebuild bone list, fix Mixamo mapping, and retarget the current BVH source"
+    bl_label = "绑定当前 BVH"
+    bl_description = "自动检查目标朝向、重建骨骼列表并绑定当前 BVH"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -412,8 +491,8 @@ class BridgeOneClickBindLast(bpy.types.Operator):
 
 class BridgeCopyDebugLog(bpy.types.Operator):
     bl_idname = "rro_bridge.copy_debug_log"
-    bl_label = "Copy Debug Log"
-    bl_description = "Copy the latest Kimodo bridge status and diagnostics to the clipboard"
+    bl_label = "复制调试日志"
+    bl_description = "复制最新 Kimodo 状态和诊断信息到剪贴板"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -439,8 +518,8 @@ class BridgeCopyDebugLog(bpy.types.Operator):
 
 class BridgeStartKimodo(bpy.types.Operator):
     bl_idname = "rro_bridge.start_kimodo"
-    bl_label = "Start Local Kimodo"
-    bl_description = "Start the local Kimodo WebUI and prompt command server"
+    bl_label = "启动本地 Kimodo"
+    bl_description = "启动本地 Kimodo WebUI 和命令服务"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -472,8 +551,8 @@ class BridgeStartKimodo(bpy.types.Operator):
 
 class BridgeStopKimodo(bpy.types.Operator):
     bl_idname = "rro_bridge.stop_kimodo"
-    bl_label = "Stop Local Kimodo Ports"
-    bl_description = "Stop processes currently occupying local Kimodo ports 7860, 7863, and 7870"
+    bl_label = "关闭 Kimodo 端口"
+    bl_description = "关闭当前占用 Kimodo 端口 7860、7863、7870 的进程"
     bl_options = {"REGISTER"}
 
     def execute(self, context):

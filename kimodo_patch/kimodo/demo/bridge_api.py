@@ -26,7 +26,7 @@ _SERVER = None
 _THREAD = None
 _QUEUE = queue.Queue()
 _WORKER = None
-_BRIDGE_VERSION = "straight-style-path-toggle-v10"
+_BRIDGE_VERSION = "straight-style-path-toggle-v13"
 
 
 def _primary_session(demo):
@@ -245,7 +245,7 @@ def _target_root_2d_from_progress(root_progress):
 
 
 def _close_loop_tail(local_rot, root_positions, skeleton, payload):
-    if not bool(payload.get("loop_close_tail", True)):
+    if not bool(payload.get("loop_close_tail", False)):
         return local_rot, root_positions, {"enabled": False}
     total_frames = int(local_rot.shape[0])
     close_frames = int(payload.get("loop_close_frames") if payload.get("loop_close_frames") is not None else 8)
@@ -725,10 +725,21 @@ def _generate_and_send(demo, payload):
     prompts, num_frames, total_duration = _parse_prompt_segments(payload, session, fps)
     seed = int(payload.get("seed") if payload.get("seed") is not None else 42)
     diffusion_steps = int(payload.get("diffusion_steps") if payload.get("diffusion_steps") is not None else 100)
-    blender_url = str(payload.get("blender_url") or os.environ.get("KIMODO_BLENDER_BRIDGE_URL") or "http://127.0.0.1:8765")
+    blender_url = str(
+        payload.get("blender_url")
+        if payload.get("blender_url") is not None
+        else os.environ.get("KIMODO_BLENDER_BRIDGE_URL")
+        or "http://127.0.0.1:8765"
+    )
+    send_to_blender = bool(blender_url.strip()) and not bool(payload.get("skip_blender_send", False))
     request_id = str(payload.get("request_id") or "")
 
-    out_dir = Path(os.environ.get("KIMODO_BRIDGE_OUTPUT_DIR") or Path(tempfile.gettempdir()) / "kimodo_blender_bridge")
+    out_dir = Path(
+        payload.get("output_dir")
+        or os.environ.get("KIMODO_BRIDGE_OUTPUT_DIR")
+        or Path(tempfile.gettempdir()) / "kimodo_blender_bridge"
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
     loop_workflow = bool(payload.get("loop_workflow", False))
     suffix = "_loop" if loop_workflow else ""
     filename = f"{_safe_stem(prompts[0])}{suffix}_{time.strftime('%Y%m%d_%H%M%S')}.bvh"
@@ -756,7 +767,7 @@ def _generate_and_send(demo, payload):
             seed,
             diffusion_steps,
         )
-        if send_debug_comparisons:
+        if send_debug_comparisons and send_to_blender:
             blender_results.append(
                 _send_to_blender(
                     original_path,
@@ -782,7 +793,7 @@ def _generate_and_send(demo, payload):
             stage2_out_path=stage2_path,
             original_output=original_output,
         )
-        if send_debug_comparisons:
+        if send_debug_comparisons and send_to_blender:
             blender_results.append(
                 _send_to_blender(
                     stage1_path,
@@ -822,9 +833,10 @@ def _generate_and_send(demo, payload):
             seed,
             diffusion_steps,
         )
-    loop_metadata = dict(loop_info)
-    loop_metadata["clip_role"] = "loop"
-    blender_results.append(_send_to_blender(out_path, blender_url, request_id=request_id, metadata=loop_metadata))
+    if send_to_blender:
+        loop_metadata = dict(loop_info)
+        loop_metadata["clip_role"] = "loop"
+        blender_results.append(_send_to_blender(out_path, blender_url, request_id=request_id, metadata=loop_metadata))
     result = {
         "ok": True,
         "bridge_version": _BRIDGE_VERSION,

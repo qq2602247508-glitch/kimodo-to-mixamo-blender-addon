@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.4.3.33 - Preferences, Cache Directory, and Animation Utility
+
+- Added Blender addon preferences for Chinese/English UI switching.
+- Added Blender addon preference to show or hide the Kimodo advanced panel, enabled by default.
+- Added configurable generated BVH/cache directory in the Kimodo advanced panel.
+- Added one-click generated cache cleanup for `.bvh`, `.json`, and `.txt` files in the configured cache directory.
+- Moved debug source armature sending/display controls into the Kimodo advanced panel.
+- Moved Process Pending and Clear Pending queue controls into the Kimodo advanced panel.
+- Default prompt duration is now 3 seconds.
+- Updated Kimodo bridge API version to `straight-style-path-toggle-v13`.
+- Added `dist/kimodo_motion_bridge_v1_4_3_33_prefs_cache.zip`.
+- Added `dist/kimodo_mixamo_v1_4_3_33_full_package.zip`.
+- Added the standalone animation loop preview and Godot export addon:
+  `playback_speed_viewer/` and `dist/animation_loop_godot_exporter_v1_4_1_arm_clearance_fix.zip`.
+
 ## 1.4.3.28 - Path Constraint Toggle
 
 - Added `Use Path Constraint` to normal generation and one-click bind.

@@ -2,6 +2,7 @@ import json
 import os
 import queue
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
@@ -185,6 +186,10 @@ def _import_bvh(path, request_id="", clip_role="loop"):
 
     if is_loop_clip and st.auto_retarget_on_receive:
         run_bind_workflow(bpy.context, imported, auto_fix_axis=True)
+        if not st.loop_send_debug_versions:
+            imported.hide_set(True)
+            imported.hide_viewport = True
+            imported.hide_render = True
     else:
         _set_active(imported)
 
@@ -238,6 +243,85 @@ def process_pending_queue(max_items=0):
         except Exception:
             pass
         print(f"[Rokoko Retarget Bridge] Import/retarget failed: {exc}")
+    return processed
+
+
+def process_request_queue(request_id, *, expected_loop=True, max_items=0, wait_seconds=6.0):
+    """Process only BVHs that belong to the active generation request.
+
+    Late BVHs from older requests are discarded here so they cannot steal an
+    automatic retarget from the current one-click generation.
+    """
+    global _LAST_ERROR
+    deadline = time.time() + max(0.0, float(wait_seconds))
+    processed = 0
+    skipped = 0
+    imported_loop = False
+    request_id = str(request_id or "")
+
+    while max_items <= 0 or processed + skipped < max_items:
+        timeout = 0.1 if time.time() < deadline else 0.0
+        try:
+            item = _QUEUE.get(timeout=timeout) if timeout else _QUEUE.get_nowait()
+        except queue.Empty:
+            if imported_loop or time.time() >= deadline:
+                break
+            continue
+
+        item_request_id = str(item.get("request_id", ""))
+        clip_role = str(item.get("clip_role", "loop") or "loop")
+        if request_id and item_request_id != request_id:
+            skipped += 1
+            try:
+                settings().last_status = (
+                    f"Skipped stale BVH {clip_role} ({item_request_id}); waiting for {request_id}"
+                )
+            except Exception:
+                pass
+            continue
+
+        if expected_loop and clip_role != "loop":
+            if settings().loop_send_debug_versions:
+                try:
+                    settings().last_status = f"Importing current debug BVH {clip_role} ({item_request_id})"
+                    _import_bvh(item["path"], request_id=item_request_id, clip_role=clip_role)
+                    processed += 1
+                except Exception as exc:
+                    _LAST_ERROR = str(exc)
+                    try:
+                        settings().last_status = f"Error importing debug BVH {clip_role}: {exc}"
+                    except Exception:
+                        pass
+                    print(f"[Rokoko Retarget Bridge] Debug import failed: {exc}")
+            else:
+                try:
+                    settings().last_status = f"Skipped current debug BVH {clip_role} ({item_request_id})"
+                except Exception:
+                    pass
+                skipped += 1
+            continue
+
+        try:
+            settings().last_status = f"Received current {clip_role} BVH, importing... ({item_request_id})"
+        except Exception:
+            pass
+        try:
+            _import_bvh(item["path"], request_id=item_request_id, clip_role=clip_role)
+            _LAST_ERROR = ""
+            processed += 1
+            if clip_role == "loop":
+                imported_loop = True
+                if expected_loop:
+                    break
+        except Exception as exc:
+            _LAST_ERROR = str(exc)
+            try:
+                settings().last_status = f"Error: {exc}"
+            except Exception:
+                pass
+            print(f"[Rokoko Retarget Bridge] Import/retarget failed: {exc}")
+            break
+
     return processed
 
 

@@ -9,13 +9,13 @@ This repository intentionally does **not** include NVIDIA Kimodo, model weights,
 Use:
 
 ```text
-dist/rokoko_retarget_bridge_v1_4_3_28_path_toggle.zip
+dist/kimodo_motion_bridge_v1_4_3_33_prefs_cache.zip
 ```
 
 Known-good local setup:
 
-- Blender addon version: `1.4.3.28`
-- Kimodo bridge API version: `straight-style-path-toggle-v10`
+- Blender addon version: `1.4.3.33`
+- Kimodo bridge API version: `straight-style-path-toggle-v13`
 - Kimodo WebUI: `http://127.0.0.1:7860`
 - Kimodo command API: `http://127.0.0.1:7870`
 - Blender BVH receiver: `http://127.0.0.1:8765`
@@ -24,6 +24,7 @@ Known-good local setup:
 
 ```text
 rokoko_retarget_bridge/       Blender addon source
+playback_speed_viewer/        Standalone animation loop preview and Godot export addon
 dist/                         Stable installable addon zip
 kimodo_patch/                 Lightweight files to copy into a local Kimodo setup
 ```
@@ -40,11 +41,36 @@ The bridge supports:
 - Use Path Constraint toggle for normal generation and one-click bind.
 - Optional debug comparison BVHs for loop generation.
 - Copyable debug logs from the Blender addon.
+- Chinese/English UI toggle in Blender addon preferences.
+- Optional advanced panel toggle in Blender addon preferences.
+- Configurable generated BVH/cache directory.
 
 For backup or transfer, use the complete package:
 
 ```text
-dist/kimodo_mixamo_v1_4_3_28_full_package.zip
+dist/kimodo_mixamo_v1_4_3_33_full_package.zip
+```
+
+## Animation Loop / Godot Export Addon
+
+The standalone animation utility addon is included here too:
+
+```text
+playback_speed_viewer/
+dist/animation_loop_godot_exporter_v1_4_1_arm_clearance_fix.zip
+```
+
+It is separate from the Kimodo retarget bridge and can be installed independently in Blender.
+
+Main features:
+
+- Drag or import BVH files for quick preview.
+- Playback speed controls for checking animation timing.
+- Trim custom start/end frames.
+- Keyframe thinning and fill/interpolation workflow for smoother loop testing.
+- In-place loop preparation helpers.
+- Shoulder/arm offset tool for simple clothing clipping cleanup.
+- Godot-friendly GLB export of the currently processed character animation.
 ```
 
 ## What Is Not Included
@@ -78,11 +104,18 @@ logs/
 4. Select:
 
 ```text
-dist/rokoko_retarget_bridge_v1_4_3_28_path_toggle.zip
+dist/kimodo_motion_bridge_v1_4_3_33_prefs_cache.zip
 ```
 
-5. Enable `Rokoko Retarget Bridge`.
-6. Open `3D View > Sidebar > Rokoko > Kimodo Bridge`.
+5. Enable `Kimodo 动作桥`.
+6. Open `3D View > Sidebar > Kimodo 动作`.
+7. In the addon preferences, choose Chinese/English UI and whether to show the advanced panel.
+
+Install the animation utility addon the same way with:
+
+```text
+dist/animation_loop_godot_exporter_v1_4_1_arm_clearance_fix.zip
+```
 
 ## Local Kimodo Patch
 

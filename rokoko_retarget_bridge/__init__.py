@@ -1,10 +1,10 @@
 bl_info = {
-    "name": "Rokoko Retarget Bridge",
+    "name": "Kimodo 动作桥",
     "author": "Rokoko Electronics ApS, trimmed by Codex",
     "category": "Animation",
-    "location": "View 3D > Sidebar > Rokoko",
-    "description": "Original Rokoko retargeting UI with Kimodo BVH Bridge, without login or cloud features.",
-    "version": (1, 4, 3, 28),
+    "location": "View 3D > Sidebar > Kimodo 动作",
+    "description": "Kimodo 生成动作并绑定到 Mixamo 角色的本地工具。",
+    "version": (1, 4, 3, 33),
     "blender": (2, 80, 0),
 }
 
@@ -16,6 +16,7 @@ from . import core
 from . import properties
 from .operators.bridge import (
     BridgeGeneratePrompt,
+    BridgeClearGeneratedCache,
     BridgeClearQueue,
     BridgeCopyDebugLog,
     BridgeProcessQueue,
@@ -46,7 +47,31 @@ from .panels.retargeting import BoneListItem, RetargetingPanel, RSL_UL_BoneList
 absolute_min_ver = (2, 80, 75)
 
 
+class KimodoBridgePreferences(bpy.types.AddonPreferences):
+    bl_idname = __name__
+
+    ui_language: bpy.props.EnumProperty(
+        name="界面语言 / UI Language",
+        items=[
+            ("ZH", "中文", "使用中文界面"),
+            ("EN", "English", "Use English UI"),
+        ],
+        default="ZH",
+    )
+    show_advanced_panel: bpy.props.BoolProperty(
+        name="显示高级面板 / Show Advanced Panel",
+        description="在 3D 视图侧栏显示 Kimodo 高级面板",
+        default=True,
+    )
+
+    def draw(self, _context):
+        layout = self.layout
+        layout.prop(self, "ui_language")
+        layout.prop(self, "show_advanced_panel")
+
+
 classes = [
+    KimodoBridgePreferences,
     RetargetingPanel,
     BridgePanel,
     BridgeAdvancedPanel,
@@ -70,6 +95,7 @@ classes = [
     BridgeStop,
     BridgeUseRokokoTarget,
     BridgeGeneratePrompt,
+    BridgeClearGeneratedCache,
     BridgeClearQueue,
     BridgeCopyDebugLog,
     BridgeProcessQueue,
