@@ -57,7 +57,7 @@ The standalone animation utility addon is included here too:
 
 ```text
 playback_speed_viewer/
-dist/animation_loop_godot_exporter_v1_4_1_arm_clearance_fix.zip
+dist/animation_loop_godot_exporter_v1_4_2_action_select.zip
 ```
 
 It is separate from the Kimodo retarget bridge and can be installed independently in Blender.
@@ -70,6 +70,8 @@ Main features:
 - Keyframe thinning and fill/interpolation workflow for smoother loop testing.
 - In-place loop preparation helpers.
 - Shoulder/arm offset tool for simple clothing clipping cleanup.
+- Detect compatible actions on the current character.
+- Export a selected action with Godot-friendly `character_action.glb` naming.
 - Godot-friendly GLB export of the currently processed character animation.
 ```
 
@@ -114,7 +116,7 @@ dist/kimodo_motion_bridge_v1_4_3_33_prefs_cache.zip
 Install the animation utility addon the same way with:
 
 ```text
-dist/animation_loop_godot_exporter_v1_4_1_arm_clearance_fix.zip
+dist/animation_loop_godot_exporter_v1_4_2_action_select.zip
 ```
 
 ## Local Kimodo Patch

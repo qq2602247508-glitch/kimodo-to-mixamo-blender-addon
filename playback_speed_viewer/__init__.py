@@ -1,7 +1,7 @@
 bl_info = {
     "name": "动画循环预览与 Godot 导出",
     "author": "Codex",
-    "version": (1, 4, 1),
+    "version": (1, 4, 2),
     "blender": (4, 0, 0),
     "location": "3D View > Sidebar > 动画工具",
     "description": "预览动画速度，处理循环关键帧，并导出 Godot 友好的 GLB。",
@@ -124,6 +124,67 @@ def _remove_temp_tracks(armature):
             armature.animation_data.nla_tracks.remove(track)
 
 
+def _compatible_actions_for_armature(armature):
+    if not _is_armature(armature):
+        return []
+
+    ordered = []
+    seen = set()
+
+    def add(action):
+        if action and action.name not in seen and _compatible_action(action, armature):
+            ordered.append(action)
+            seen.add(action.name)
+
+    if armature.animation_data:
+        add(armature.animation_data.action)
+        for track in armature.animation_data.nla_tracks:
+            for strip in track.strips:
+                add(strip.action)
+
+    for action in sorted(bpy.data.actions, key=lambda item: item.name.lower()):
+        add(action)
+    return ordered
+
+
+def _action_enum_items(self, context):
+    scene = context.scene
+    armature = scene.psv_godot_target_armature or _find_selected_armature(context)
+    actions = _compatible_actions_for_armature(armature)
+    if not actions:
+        return [("", "没有识别到兼容动作", "当前角色没有可导出的兼容 Action")]
+
+    active = armature.animation_data.action if armature and armature.animation_data else None
+    items = []
+    for action in actions:
+        start, end = action.frame_range
+        label = action.name
+        if active == action:
+            label += "  [当前]"
+        items.append(
+            (
+                action.name,
+                label,
+                f"Godot 动画名: {_sanitize_name(action.name)} | 帧范围 {start:g}-{end:g}",
+            )
+        )
+    return items
+
+
+def _selected_godot_action(scene, armature):
+    selected = scene.psv_godot_action_name
+    if selected:
+        action = bpy.data.actions.get(selected)
+        if _compatible_action(action, armature):
+            return action
+
+    if armature.animation_data and _compatible_action(armature.animation_data.action, armature):
+        return armature.animation_data.action
+
+    actions = _compatible_actions_for_armature(armature)
+    return actions[0] if actions else None
+
+
 def _create_temp_nla_tracks(armature, actions):
     armature.animation_data_create()
     _remove_temp_tracks(armature)
@@ -152,7 +213,7 @@ def _select_export_objects(context, armature):
     return meshes
 
 
-def _output_path(context, armature):
+def _output_path(context, armature, action_name=None):
     scene = context.scene
     output_dir = bpy.path.abspath(scene.psv_godot_output_dir)
     if not output_dir:
@@ -160,6 +221,8 @@ def _output_path(context, armature):
     os.makedirs(output_dir, exist_ok=True)
 
     file_name = scene.psv_godot_file_name.strip()
+    if action_name and scene.psv_godot_auto_action_filename:
+        file_name = f"{_sanitize_name(armature.name)}_{_sanitize_name(action_name)}.glb"
     if not file_name:
         file_name = _sanitize_name(armature.name) + "_godot.glb"
     if not file_name.lower().endswith(".glb"):
@@ -494,9 +557,10 @@ class PSV_OT_export_godot_glb(bpy.types.Operator):
         name="导出模式",
         items=(
             ("ACTIVE", "当前动作", "只导出当前骨架正在使用的 Action"),
+            ("SELECTED", "选中动作", "导出动作列表里选中的 Action，并按角色名_动作名命名"),
             ("COMPATIBLE", "全部兼容动作", "导出所有骨骼名匹配当前骨架的 Action"),
         ),
-        default="ACTIVE",
+        default="SELECTED",
     )
 
     def execute(self, context):
@@ -508,6 +572,7 @@ class PSV_OT_export_godot_glb(bpy.types.Operator):
         scene.psv_godot_target_armature = armature
 
         actions = []
+        export_action_name = None
         if self.mode == "ACTIVE":
             action = armature.animation_data.action if armature.animation_data else None
             if action is None:
@@ -516,16 +581,24 @@ class PSV_OT_export_godot_glb(bpy.types.Operator):
             if not _compatible_action(action, armature):
                 self.report({"ERROR"}, "当前 Action 的骨骼名和目标骨架不匹配。")
                 return {"CANCELLED"}
+            export_action_name = action.name
+            actions.append((_sanitize_name(action.name), action))
+        elif self.mode == "SELECTED":
+            action = _selected_godot_action(scene, armature)
+            if action is None:
+                self.report({"ERROR"}, "当前角色没有可导出的兼容动作。")
+                return {"CANCELLED"}
+            export_action_name = action.name
+            scene.psv_godot_action_name = action.name
             actions.append((_sanitize_name(action.name), action))
         else:
-            for action in sorted(bpy.data.actions, key=lambda item: item.name.lower()):
-                if _compatible_action(action, armature):
-                    actions.append((_sanitize_name(action.name), action))
+            for action in _compatible_actions_for_armature(armature):
+                actions.append((_sanitize_name(action.name), action))
             if not actions:
                 self.report({"ERROR"}, "没有找到和当前骨架兼容的 Action。")
                 return {"CANCELLED"}
 
-        filepath = _output_path(context, armature)
+        filepath = _output_path(context, armature, export_action_name if len(actions) == 1 else None)
         original_selection = list(context.selected_objects)
         original_active = context.view_layer.objects.active
         keep_tracks = scene.psv_godot_keep_tracks
@@ -849,9 +922,15 @@ class PSV_PT_panel(bpy.types.Panel):
         target = scene.psv_godot_target_armature
         layout.label(text="角色: " + (target.name if target else "未设置"))
         layout.operator("psv.set_godot_target", icon="EYEDROPPER")
+        actions = _compatible_actions_for_armature(target) if target else []
+        layout.label(text=f"识别动作: {len(actions)} 个")
+        layout.prop(scene, "psv_godot_action_name", text="动作")
         layout.prop(scene, "psv_godot_output_dir", text="目录")
         layout.prop(scene, "psv_godot_file_name", text="文件名")
+        layout.prop(scene, "psv_godot_auto_action_filename", text="按角色_动作自动命名")
         layout.prop(scene, "psv_godot_keep_tracks", text="保留临时 NLA")
+        op = layout.operator("psv.export_godot_glb", text="导出选中动作", icon="EXPORT")
+        op.mode = "SELECTED"
         row = layout.row(align=True)
         op = row.operator("psv.export_godot_glb", text="导出当前动作", icon="EXPORT")
         op.mode = "ACTIVE"
@@ -993,6 +1072,16 @@ def register():
         default="",
         description="Output GLB file name. Empty uses the armature name",
     )
+    bpy.types.Scene.psv_godot_action_name = EnumProperty(
+        name="Godot Action",
+        items=_action_enum_items,
+        description="Action detected for the current export character",
+    )
+    bpy.types.Scene.psv_godot_auto_action_filename = BoolProperty(
+        name="Auto Action File Name",
+        default=True,
+        description="When exporting one action, name the GLB as character_action.glb for Godot",
+    )
     bpy.types.Scene.psv_godot_keep_tracks = BoolProperty(
         name="Keep Temporary NLA Tracks",
         default=False,
@@ -1022,6 +1111,8 @@ def unregister():
         "psv_godot_target_armature",
         "psv_godot_output_dir",
         "psv_godot_file_name",
+        "psv_godot_action_name",
+        "psv_godot_auto_action_filename",
         "psv_godot_keep_tracks",
     ):
         if hasattr(bpy.types.Scene, attr):

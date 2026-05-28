@@ -13,7 +13,8 @@
 - Added `dist/kimodo_motion_bridge_v1_4_3_33_prefs_cache.zip`.
 - Added `dist/kimodo_mixamo_v1_4_3_33_full_package.zip`.
 - Added the standalone animation loop preview and Godot export addon:
-  `playback_speed_viewer/` and `dist/animation_loop_godot_exporter_v1_4_1_arm_clearance_fix.zip`.
+  `playback_speed_viewer/` and `dist/animation_loop_godot_exporter_v1_4_2_action_select.zip`.
+- Animation export addon now detects compatible actions for the current character, lets you pick one, and exports it with Godot-friendly `character_action.glb` naming.
 
 ## 1.4.3.28 - Path Constraint Toggle
 
